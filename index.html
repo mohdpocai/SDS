@@ -296,12 +296,15 @@
 <div class="app-container">
     <div class="header">
         <h1>🌿 Sistem Pengurusan SDS & Bahan Kimia</h1>
-        <span style="font-size: 13px; color: var(--text-muted);">Sistem Pemantauan Status Expiry SDS</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 13px; color: var(--text-muted);">🔒 Kawalan Akses Authorized Person</span>
+            <button class="btn-action" onclick="changeAdminPin()" style="font-size: 11px;">⚙️ Tukar PIN Admin</button>
+        </div>
     </div>
 
     <!-- Form Input Card -->
     <div class="card">
-        <div class="card-title" id="formTitle">➕ Pendaftaran SDS Bahan Kimia Baru</div>
+        <div class="card-title" id="formTitle">➕ Pendaftaran SDS Bahan Kimia Baru (Memerlukan PIN)</div>
         <form id="sdsForm" onsubmit="saveSDS(event)">
             <input type="hidden" id="editIndex" value="-1">
 
@@ -356,7 +359,7 @@
         <!-- Butang Import & Eksport Data -->
         <div style="display: flex; gap: 8px;">
             <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 14px; font-weight:600;">📥 Eksport Backup</button>
-            <button type="button" class="btn-action" onclick="document.getElementById('importFile').click()" style="background: #0d9488; color: white; border: none; padding: 8px 14px; font-weight:600;">📤 Import Data</button>
+            <button type="button" class="btn-action" onclick="triggerImport()" style="background: #0d9488; color: white; border: none; padding: 8px 14px; font-weight:600;">📤 Import Data 🔒</button>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
         </div>
     </div>
@@ -406,6 +409,35 @@
 
 <script>
     let activeModalItem = null;
+    
+    // TETAPAN PIN ADMIN (Default PIN: 1234)
+    function getAdminPin() {
+        return localStorage.getItem('adminPin') || '1234';
+    }
+
+    function verifyAuthorizedPerson() {
+        const inputPin = prompt("🔑 Pengesahan Authorized Person Required:\nSila masukkan PIN kebenaran untuk meneruskan:");
+        if (inputPin === null) return false; // Dibatalkan
+        
+        if (inputPin === getAdminPin()) {
+            return true;
+        } else {
+            alert("❌ PIN Salah! Akses ditolak.");
+            return false;
+        }
+    }
+
+    function changeAdminPin() {
+        if (verifyAuthorizedPerson()) {
+            const newPin = prompt("Masukkan PIN Baru Authorized Person:");
+            if (newPin && newPin.trim().length >= 4) {
+                localStorage.setItem('adminPin', newPin.trim());
+                alert("✅ PIN Admin berjaya dikemaskini!");
+            } else if (newPin !== null) {
+                alert("❌ PIN mestilah sekurang-kurangnya 4 digit.");
+            }
+        }
+    }
 
     function autoCalculateExpiry() {
         const revDateInput = document.getElementById('revDate').value;
@@ -494,8 +526,8 @@
                 </td>
                 <td style="text-align: right;">
                     <button class="btn-action" onclick="viewSDS(${index})">Detail</button>
-                    <button class="btn-action btn-warning" onclick="editSDS(${index})">Edit</button>
-                    <button class="btn-action btn-danger" onclick="deleteSDS(${index})">Hapus</button>
+                    <button class="btn-action btn-warning" onclick="editSDS(${index})">Edit 🔒</button>
+                    <button class="btn-action btn-danger" onclick="deleteSDS(${index})">Hapus 🔒</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -504,6 +536,10 @@
 
     function saveSDS(e) {
         e.preventDefault();
+        
+        // Meminta PIN Pengesahan sebelum simpan/kemaskini
+        if (!verifyAuthorizedPerson()) return;
+
         const data = getSDSData();
         const editIndex = parseInt(document.getElementById('editIndex').value);
 
@@ -532,6 +568,9 @@
     }
 
     function editSDS(index) {
+        // Meminta PIN Pengesahan sebelum benarkan edit
+        if (!verifyAuthorizedPerson()) return;
+
         const data = getSDSData();
         const item = data[index];
 
@@ -554,12 +593,15 @@
     function resetForm() {
         document.getElementById('sdsForm').reset();
         document.getElementById('editIndex').value = '-1';
-        document.getElementById('formTitle').innerText = '➕ Pendaftaran SDS Bahan Kimia Baru';
+        document.getElementById('formTitle').innerText = '➕ Pendaftaran SDS Bahan Kimia Baru (Memerlukan PIN)';
         document.getElementById('btnSubmit').innerText = 'Simpan Rekod Baru';
         document.getElementById('btnCancel').style.display = 'none';
     }
 
     function deleteSDS(index) {
+        // Meminta PIN Pengesahan sebelum benarkan padam
+        if (!verifyAuthorizedPerson()) return;
+
         if (confirm("Adakah anda pasti mahu memadamkan rekod ini?")) {
             const data = getSDSData();
             data.splice(index, 1);
@@ -628,7 +670,6 @@
         }
     }
 
-    // FUNGSI EKSPORT BACKUP DATA
     function exportData() {
         const data = localStorage.getItem('sdsData');
         if (!data || JSON.parse(data).length === 0) {
@@ -644,7 +685,12 @@
         URL.revokeObjectURL(url);
     }
 
-    // FUNGSI IMPORT BACKUP DATA
+    function triggerImport() {
+        if (verifyAuthorizedPerson()) {
+            document.getElementById('importFile').click();
+        }
+    }
+
     function importData(event) {
         const file = event.target.files[0];
         if (!file) return;
