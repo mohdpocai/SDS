@@ -304,7 +304,7 @@
 
     <!-- Form Input Card -->
     <div class="card">
-        <div class="card-title" id="formTitle">➕ Pendaftaran SDS Bahan Kimia Baru (Memerlukan PIN)</div>
+        <div class="card-title" id="formTitle">🔒 Pendaftaran & Kemaskini SDS (Memerlukan PIN)</div>
         <form id="sdsForm" onsubmit="saveSDS(event)">
             <input type="hidden" id="editIndex" value="-1">
 
@@ -346,7 +346,7 @@
             </div>
             
             <div class="btn-group">
-                <button type="submit" id="btnSubmit" class="btn-primary">Simpan Rekod Baru</button>
+                <button type="submit" id="btnSubmit" class="btn-primary">🔑 Simpan Rekod (Perlu PIN)</button>
                 <button type="button" id="btnCancel" class="btn-secondary" onclick="resetForm()" style="display: none;">Batal Edit</button>
             </div>
         </form>
@@ -417,7 +417,7 @@
 
     function verifyAuthorizedPerson() {
         const inputPin = prompt("🔑 Pengesahan Authorized Person Required:\nSila masukkan PIN kebenaran untuk meneruskan:");
-        if (inputPin === null) return false; // Dibatalkan
+        if (inputPin === null) return false; // Dibatalkan oleh pengguna
         
         if (inputPin === getAdminPin()) {
             return true;
@@ -537,7 +537,7 @@
     function saveSDS(e) {
         e.preventDefault();
         
-        // Meminta PIN Pengesahan sebelum simpan/kemaskini
+        // MESTI masukkan PIN sebelum Rekod Baru/Kemaskini disimpan
         if (!verifyAuthorizedPerson()) return;
 
         const data = getSDSData();
@@ -568,7 +568,7 @@
     }
 
     function editSDS(index) {
-        // Meminta PIN Pengesahan sebelum benarkan edit
+        // MESTI masukkan PIN sebelum benarkan edit
         if (!verifyAuthorizedPerson()) return;
 
         const data = getSDSData();
@@ -584,7 +584,7 @@
         document.getElementById('driveUrlEng').value = item.driveUrlEng || '';
 
         document.getElementById('formTitle').innerText = '✏️ Kemaskini / Edit SDS Bahan Kimia';
-        document.getElementById('btnSubmit').innerText = 'Kemaskini Rekod';
+        document.getElementById('btnSubmit').innerText = '🔑 Kemaskini Rekod (Perlu PIN)';
         document.getElementById('btnCancel').style.display = 'inline-block';
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -593,13 +593,13 @@
     function resetForm() {
         document.getElementById('sdsForm').reset();
         document.getElementById('editIndex').value = '-1';
-        document.getElementById('formTitle').innerText = '➕ Pendaftaran SDS Bahan Kimia Baru (Memerlukan PIN)';
-        document.getElementById('btnSubmit').innerText = 'Simpan Rekod Baru';
+        document.getElementById('formTitle').innerText = '🔒 Pendaftaran & Kemaskini SDS (Memerlukan PIN)';
+        document.getElementById('btnSubmit').innerText = '🔑 Simpan Rekod (Perlu PIN)';
         document.getElementById('btnCancel').style.display = 'none';
     }
 
     function deleteSDS(index) {
-        // Meminta PIN Pengesahan sebelum benarkan padam
+        // MESTI masukkan PIN sebelum benarkan padam
         if (!verifyAuthorizedPerson()) return;
 
         if (confirm("Adakah anda pasti mahu memadamkan rekod ini?")) {
