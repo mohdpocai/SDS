@@ -311,7 +311,7 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Nama & Brand Bahan Kimia</label>
-                    <input type="text" id="chemName" placeholder="Cth: Monex / Kenlon 480" required>
+                    <input type="text" id="chemName" placeholder="Cth: Monex / Triclopyr 480" required>
                 </div>
                 <div class="form-group">
                     <label>Kelas Racun / Hazchem</label>
@@ -356,10 +356,11 @@
     <div class="controls">
         <input type="text" id="searchInput" class="search-input" onkeyup="filterTable()" placeholder="🔍 Cari bahan kimia, status (Luput / Hampir Luput)...">
         
-        <!-- Butang Import & Eksport Data -->
+        <!-- Butang Import, Eksport & Reset -->
         <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 14px; font-weight:600;">📥 Eksport Backup</button>
-            <button type="button" class="btn-action" onclick="triggerImport()" style="background: #0d9488; color: white; border: none; padding: 8px 14px; font-weight:600;">📤 Import Data 🔒</button>
+            <button type="button" class="btn-action" onclick="resetToDefaultData()" style="background: #e11d48; color: white; border: none; padding: 8px 12px; font-weight:600;">🔄 Reset Data Asal 🔒</button>
+            <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 12px; font-weight:600;">📥 Eksport Backup</button>
+            <button type="button" class="btn-action" onclick="triggerImport()" style="background: #0d9488; color: white; border: none; padding: 8px 12px; font-weight:600;">📤 Import Data 🔒</button>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
         </div>
     </div>
@@ -409,15 +410,55 @@
 
 <script>
     let activeModalItem = null;
-    
-    // TETAPAN PIN ADMIN (Default PIN: 1234)
+
+    // ========================================================
+    // DATA DEFAULT TERUS TERSIMPAN DI DALAM KOD HTML
+    // (Boleh disunting atau ditambah mengikut senarai racun anda)
+    // ========================================================
+    const DATA_SDS_ASAL = [
+        {
+            "id": 101,
+            "name": "Monex HC",
+            "chemClass": "CLASS II",
+            "revDate": "2023-01-15",
+            "expDate": "2028-01-15",
+            "casNumber": "1071-83-6",
+            "driveUrlBm": "https://drive.google.com/file/d/sample_monex_bm/view",
+            "driveUrlEng": "https://drive.google.com/file/d/sample_monex_eng/view"
+        },
+        {
+            "id": 102,
+            "name": "Glyphosate-IPA 41%",
+            "chemClass": "CLASS III",
+            "revDate": "2022-06-10",
+            "expDate": "2027-06-10",
+            "casNumber": "38641-94-0",
+            "driveUrlBm": "https://drive.google.com/file/d/sample_glyphosate_bm/view",
+            "driveUrlEng": "https://drive.google.com/file/d/sample_glyphosate_eng/view"
+        },
+        {
+            "id": 103,
+            "name": "Triclopyr Butoxyethyl Ester (Kenlon)",
+            "chemClass": "CLASS II",
+            "revDate": "2021-03-20",
+            "expDate": "2026-03-20",
+            "casNumber": "64700-56-7",
+            "driveUrlBm": null,
+            "driveUrlEng": null
+        }
+    ];
+
+    // ========================================================
+    // TENTUKAN PIN ADMIN KOD
+    // Jika terlupa, anda boleh tukar terus nilai '1234' di bawah
+    // ========================================================
     function getAdminPin() {
-        return localStorage.getItem('adminPin') || '1234';
+        return localStorage.getItem('adminPin') || '1234'; 
     }
 
     function verifyAuthorizedPerson() {
-        const inputPin = prompt("🔑 Pengesahan Authorized Person Required:\nSila masukkan PIN kebenaran untuk meneruskan:");
-        if (inputPin === null) return false; // Dibatalkan oleh pengguna
+        const inputPin = prompt("🔑 Pengesahan Authorized Person Required:\nSila masukkan PIN kebenaran:");
+        if (inputPin === null) return false;
         
         if (inputPin === getAdminPin()) {
             return true;
@@ -435,6 +476,26 @@
                 alert("✅ PIN Admin berjaya dikemaskini!");
             } else if (newPin !== null) {
                 alert("❌ PIN mestilah sekurang-kurangnya 4 digit.");
+            }
+        }
+    }
+
+    // Fungsi membaca data (Guna DATA_SDS_ASAL jika belum wujud dalam Browser)
+    function getSDSData() {
+        const stored = localStorage.getItem('sdsData');
+        if (!stored) {
+            localStorage.setItem('sdsData', JSON.stringify(DATA_SDS_ASAL));
+            return DATA_SDS_ASAL;
+        }
+        return JSON.parse(stored);
+    }
+
+    function resetToDefaultData() {
+        if (verifyAuthorizedPerson()) {
+            if (confirm("Adakah anda pasti mahu mengembalikan semua data SDS kepada data asal yang terembedded dalam kod?")) {
+                localStorage.setItem('sdsData', JSON.stringify(DATA_SDS_ASAL));
+                renderTable();
+                alert("✅ Data berjaya di-reset ke data asal!");
             }
         }
     }
@@ -472,11 +533,6 @@
         } else {
             return { text: '🟢 Aktif', class: 'status-active', rawStatus: 'Aktif Active' };
         }
-    }
-
-    function getSDSData() {
-        const stored = localStorage.getItem('sdsData');
-        return stored ? JSON.parse(stored) : [];
     }
 
     function formatDriveEmbedUrl(url) {
@@ -537,7 +593,6 @@
     function saveSDS(e) {
         e.preventDefault();
         
-        // MESTI masukkan PIN sebelum Rekod Baru/Kemaskini disimpan
         if (!verifyAuthorizedPerson()) return;
 
         const data = getSDSData();
@@ -568,7 +623,6 @@
     }
 
     function editSDS(index) {
-        // MESTI masukkan PIN sebelum benarkan edit
         if (!verifyAuthorizedPerson()) return;
 
         const data = getSDSData();
@@ -599,7 +653,6 @@
     }
 
     function deleteSDS(index) {
-        // MESTI masukkan PIN sebelum benarkan padam
         if (!verifyAuthorizedPerson()) return;
 
         if (confirm("Adakah anda pasti mahu memadamkan rekod ini?")) {
@@ -700,7 +753,7 @@
             try {
                 const importedData = JSON.parse(e.target.result);
                 if (Array.isArray(importedData)) {
-                    if (confirm("Adakah anda mahu menggantikan/menambah data sedia ada dengan fail backup ini?")) {
+                    if (confirm("Adakah anda mahu menggantikan data sedia ada dengan fail backup ini?")) {
                         localStorage.setItem('sdsData', JSON.stringify(importedData));
                         renderTable();
                         alert("Data SDS berjaya diimport!");
