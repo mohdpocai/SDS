@@ -295,7 +295,7 @@
 
 <div class="app-container">
     <div class="header">
-        <h1>🌿 Sistem Pengurusan SDS & Bahan Kimia</h1>
+        <h1>🌿 Sistem Pengurusan SDS & Bahan Kimia Estate</h1>
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 13px; color: var(--text-muted);">🔒 Kawalan Akses Authorized Person</span>
             <button class="btn-action" onclick="changeAdminPin()" style="font-size: 11px;">⚙️ Tukar PIN Admin</button>
@@ -311,7 +311,7 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Nama & Brand Bahan Kimia</label>
-                    <input type="text" id="chemName" placeholder="Cth: Monex / Triclopyr 480" required>
+                    <input type="text" id="chemName" placeholder="Cth: Monex HC / Triclopyr" required>
                 </div>
                 <div class="form-group">
                     <label>Kelas Racun / Hazchem</label>
@@ -337,11 +337,11 @@
                 
                 <div class="form-group half-width">
                     <label>Pautan SDS Bahasa Melayu (BM)</label>
-                    <input type="url" id="driveUrlBm" placeholder="https://drive.google.com/file/d/.../view">
+                    <input type="url" id="driveUrlBm" placeholder="https://drive.google.com/...">
                 </div>
                 <div class="form-group half-width">
                     <label>Pautan SDS Bahasa Inggeris (ENG)</label>
-                    <input type="url" id="driveUrlEng" placeholder="https://drive.google.com/file/d/.../view">
+                    <input type="url" id="driveUrlEng" placeholder="https://drive.google.com/...">
                 </div>
             </div>
             
@@ -354,9 +354,8 @@
 
     <!-- Controls -->
     <div class="controls">
-        <input type="text" id="searchInput" class="search-input" onkeyup="filterTable()" placeholder="🔍 Cari bahan kimia, status (Luput / Hampir Luput)...">
+        <input type="text" id="searchInput" class="search-input" onkeyup="filterTable()" placeholder="🔍 Cari bahan kimia, CAS No, status...">
         
-        <!-- Butang Import, Eksport & Reset -->
         <div style="display: flex; gap: 8px;">
             <button type="button" class="btn-action" onclick="resetToDefaultData()" style="background: #e11d48; color: white; border: none; padding: 8px 12px; font-weight:600;">🔄 Reset Data Asal 🔒</button>
             <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 12px; font-weight:600;">📥 Eksport Backup</button>
@@ -412,46 +411,38 @@
     let activeModalItem = null;
 
     // ========================================================
-    // DATA DEFAULT TERUS TERSIMPAN DI DALAM KOD HTML
-    // (Boleh disunting atau ditambah mengikut senarai racun anda)
+    // DATA ASAL BAHAN KIMIA ESTATE TERSIMPAN DI DALAM KOD
     // ========================================================
     const DATA_SDS_ASAL = [
-        {
-            "id": 101,
-            "name": "Monex HC",
-            "chemClass": "CLASS II",
-            "revDate": "2023-01-15",
-            "expDate": "2028-01-15",
-            "casNumber": "1071-83-6",
-            "driveUrlBm": "https://drive.google.com/file/d/sample_monex_bm/view",
-            "driveUrlEng": "https://drive.google.com/file/d/sample_monex_eng/view"
-        },
-        {
-            "id": 102,
-            "name": "Glyphosate-IPA 41%",
-            "chemClass": "CLASS III",
-            "revDate": "2022-06-10",
-            "expDate": "2027-06-10",
-            "casNumber": "38641-94-0",
-            "driveUrlBm": "https://drive.google.com/file/d/sample_glyphosate_bm/view",
-            "driveUrlEng": "https://drive.google.com/file/d/sample_glyphosate_eng/view"
-        },
-        {
-            "id": 103,
-            "name": "Triclopyr Butoxyethyl Ester (Kenlon)",
-            "chemClass": "CLASS II",
-            "revDate": "2021-03-20",
-            "expDate": "2026-03-20",
-            "casNumber": "64700-56-7",
-            "driveUrlBm": null,
-            "driveUrlEng": null
-        }
+        {"id":1785905741244,"name":"ANCOM AMINE 60, RARITY AMINE 60 ","chemClass":"CLASS II","revDate":"2022-08-08","expDate":"2027-08-08","casNumber":"2008-39-1","driveUrlBm":"https://drive.google.com/open?id=1s7u5bgxcQR2nc7vSrlW9PE8qM910CBtv&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1s7u5bgxcQR2nc7vSrlW9PE8qM910CBtv&usp=drive_copy"},
+        {"id":1785906072359,"name":"NK-13.75/27 (AC)","chemClass":"CLASS II","revDate":"2025-01-15","expDate":"2030-01-15","casNumber":"57-13-6, 7447-40-7","driveUrlBm":"https://drive.google.com/open?id=1m2ay1F0La5gRgOuzvnOqjTLTjgKFTUFC&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=10SvQPb4QFGzAl_9PtbHhX_J-ekTtroBT&usp=drive_copy"},
+        {"id":1785906662017,"name":"PETRONAS URANIA 3000 15W-40","chemClass":"CLASS III","revDate":"2025-04-15","expDate":"2030-04-15","casNumber":"64742-54-7, 64742-55-8, 93819-94-4","driveUrlBm":"https://drive.google.com/open?id=1is1CzcTbJlg3paZ_T3_wAF53Wboog0-O&usp=drive_copy","driveUrlEng":null},
+        {"id":1785906830375,"name":"PETRONAS URANIA 500 10W","chemClass":"CLASS II","revDate":"2025-06-12","expDate":"2030-06-12","casNumber":"64742-54-7, 93819-94-4","driveUrlBm":"https://drive.google.com/open?id=1rf5N77ccrkTp0ezAQV4YAzJtbngGoXWX&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1OIeJkt5Bd85M6aq1XcFdw6HKSmKQi-4w&usp=drive_copy"},
+        {"id":1785906947303,"name":"PETRONAS HYDRAULIC 68","chemClass":"CLASS II","revDate":"2022-03-17","expDate":"2027-03-17","casNumber":"128-39-2","driveUrlBm":"https://drive.google.com/open?id=1iV8iKbI3_kK1PAUlpiF9b3O14jsmjQx6&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1M4jEiAPILqcz3OR-GxwXCO5vjusAgkGA&usp=drive_copy"},
+        {"id":1785907066263,"name":"ACTIVATOR ","chemClass":"CLASS II","revDate":"2023-02-08","expDate":"2028-02-08","casNumber":"61827-42-7","driveUrlBm":"https://drive.google.com/open?id=14Vn7aRdgLTfpJQZVACdtEEt41_elf9B4&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1sgs1Lr5CTduYdchuwE5QsH-sY0PU7Ijb&usp=drive_copy"},
+        {"id":1785907151655,"name":"TORNADO ","chemClass":"CLASS II","revDate":"2023-10-12","expDate":"2028-10-12","casNumber":"56073-10-0","driveUrlBm":"https://drive.google.com/open?id=1Z7u-x2UAfLDq3UXsqCOuwsIozyqFOFxP&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1Z7u-x2UAfLDq3UXsqCOuwsIozyqFOFxP&usp=drive_copy"},
+        {"id":1785907253788,"name":"CHLOROPHACINONE 0.01% BB ","chemClass":"CLASS II","revDate":"2025-05-22","expDate":"2030-05-22","casNumber":"3691-35-8 ","driveUrlBm":"https://drive.google.com/open?id=1ZAG24d2ajTyOQTTKyeOgYDTBjUSZ6p6A&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1ZAG24d2ajTyOQTTKyeOgYDTBjUSZ6p6A&usp=drive_copy"},
+        {"id":1785907352484,"name":"CYLEX 16EC","chemClass":"CLASS II","revDate":"2024-01-11","expDate":"2029-01-11","casNumber":"52315-07-8","driveUrlBm":"https://drive.google.com/open?id=1io1Cg3UehygRPdcqDs4yjWfSnLAW-O74&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1io1Cg3UehygRPdcqDs4yjWfSnLAW-O74&usp=drive_copy"},
+        {"id":1785907536170,"name":"DIURON F42","chemClass":"CLASS II","revDate":"2022-05-13","expDate":"2027-05-13","casNumber":"330-54-1 ","driveUrlBm":"https://drive.google.com/open?id=11v8XwA5vtI5z9AgbvYFRPH_AoHNTOlKM&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=11v8XwA5vtI5z9AgbvYFRPH_AoHNTOlKM&usp=drive_copy"},
+        {"id":1785907667484,"name":"EXERT, SHIELD, SUPRESATE 41","chemClass":"CLASS II","revDate":"2025-04-11","expDate":"2030-04-11","casNumber":"38641-94-0","driveUrlBm":"https://drive.google.com/open?id=1P4p2WLBn6tyurrYKd2bBIxDaZqbqwd-c&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1P4p2WLBn6tyurrYKd2bBIxDaZqbqwd-c&usp=drive_copy"},
+        {"id":1785907738169,"name":"PALMOL GP1, GP KROPSI, AKAEXERT, MKABUT 480, TECHNOSIM 480 ","chemClass":"CLASS II","revDate":"2025-04-11","expDate":"2030-04-11","casNumber":"38641-94-0","driveUrlBm":"https://drive.google.com/open?id=1jfRZ6v0nzKN6U3URPZvU2cJo5XdnN3Mb&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1jfRZ6v0nzKN6U3URPZvU2cJo5XdnN3Mb&usp=drive_copy"},
+        {"id":1785907898389,"name":"HELIX 5.0SC","chemClass":"CLASS II","revDate":"2024-07-13","expDate":"2029-07-13","casNumber":"79983-71-4","driveUrlBm":"https://drive.google.com/open?id=1p6xzFsk0RsxkHpK3XUOqj51LTjrSML-e&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1p6xzFsk0RsxkHpK3XUOqj51LTjrSML-e&usp=drive_copy"},
+        {"id":1785908096704,"name":"Kenlon  ","chemClass":"CLASS II","revDate":"2023-02-13","expDate":"2028-02-13","casNumber":"64700-56-7","driveUrlBm":"https://drive.google.com/open?id=1Cm9jtoZK4_LOSVOd_7frIvXiA_8yrCdP&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1NlN0Xn4wDWGZCavlfU93_u9CDG76Xm4A&usp=drive_copy"},
+        {"id":1785908292694,"name":"KRUSH ","chemClass":"CLASS II","revDate":"2025-02-17","expDate":"2030-02-17","casNumber":"39600-42-5, 68140-01-2, 7732-18-5 ","driveUrlBm":"https://drive.google.com/open?id=1q1Sneo2O2clli0rscb5bmI8jdbgxnuKL&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=15YhJluoXTxegI66UsXTtJRmvkcuSckgf&usp=drive_copy"},
+        {"id":1785908391483,"name":"LINCOLN ","chemClass":"CLASS II","revDate":"2024-06-11","expDate":"2029-06-11","casNumber":"7775-09-9 ","driveUrlBm":"https://drive.google.com/open?id=1HxV1Md5UlLNbpCZFLhVtsSjLU5xduE3U&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1HxV1Md5UlLNbpCZFLhVtsSjLU5xduE3U&usp=drive_copy"},
+        {"id":1785908604850,"name":"MATTA 5GR ","chemClass":"CLASS II","revDate":"2023-04-28","expDate":"2028-04-28","casNumber":"55285-14-8 ","driveUrlBm":"https://drive.google.com/open?id=1J-Bc99J9JR5hY4HYBp58ZIk_fSpR0dvl&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1Lo88LM-C1HVGtcnKvxEM8axXzJlVivJa&usp=drive_copy"},
+        {"id":1785908689018,"name":"METFURON 20 ","chemClass":"CLASS II","revDate":"2022-07-12","expDate":"2027-07-12","casNumber":"74223-64-6 ","driveUrlBm":"https://drive.google.com/open?id=1GQML1G51syDxKRlvBkCOkZnF6cqmuTBf&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=10dqRG07WTAyrJTPoQ4nuOr_zzbDui60G&usp=drive_copy"},
+        {"id":1785908797358,"name":"MONEX HC, SORNIC HC","chemClass":"CLASS II","revDate":"2024-08-09","expDate":"2029-08-09","casNumber":"2163-80-6, 330-54-1 ","driveUrlBm":"https://drive.google.com/open?id=190ajT8D01eW8jc2Hgh25TIz2nZcQz1Ab&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=190ajT8D01eW8jc2Hgh25TIz2nZcQz1Ab&usp=drive_copy"},
+        {"id":1785908889006,"name":"Blendo 3 In 1 ","chemClass":"CLASS II","revDate":"2024-03-13","expDate":"2029-03-13","casNumber":"63148-62-9, 9016-45-9","driveUrlBm":"https://drive.google.com/open?id=1rXSOQwTTVLSuxCKiOzl3-oTTQU44IET_&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1vgPqfKnuPflNDXkNlnG5TEXBk3uCCreK&usp=drive_copy"},
+        {"id":1785908965788,"name":"Egyptian Rock Phosphate ","chemClass":"CLASS II","revDate":"2026-04-15","expDate":"2031-04-15","casNumber":"1306-05-4 ","driveUrlBm":"https://drive.google.com/open?id=1zokwnIiGiHbhAWg0EeUl8ioGQgDVgfI6&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1zokwnIiGiHbhAWg0EeUl8ioGQgDVgfI6&usp=drive_copy"},
+        {"id":1785909105221,"name":"ARAKUS ","chemClass":"CLASS II","revDate":"2022-03-01","expDate":"2027-03-01","casNumber":"56073-10-0","driveUrlBm":"https://drive.google.com/open?id=1DM3tc5NC6cl-rYS1SeWk2gXZaDrfx3lQ&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1DM3tc5NC6cl-rYS1SeWk2gXZaDrfx3lQ&usp=drive_copy"},
+        {"id":1785909172677,"name":"PETRONAS Diesel Euro 5 (B10) ","chemClass":"CLASS II","revDate":"2025-02-21","expDate":"2030-02-21","casNumber":"68334-30-5","driveUrlBm":"https://drive.google.com/open?id=15sF8pwfUhbwIrQiQR-ek4Tby5damNGfb&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=15sF8pwfUhbwIrQiQR-ek4Tby5damNGfb&usp=drive_copy"},
+        {"id":1785909256563,"name":"Rock Phosphate ","chemClass":"CLASS II","revDate":"2026-01-15","expDate":"2031-01-15","casNumber":"1306-05-4","driveUrlBm":"https://drive.google.com/open?id=13Hy41qsbfpD_GwL__wX2_78n8yvx-xU2&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=13Hy41qsbfpD_GwL__wX2_78n8yvx-xU2&usp=drive_copy"},
+        {"id":1785909399844,"name":"Verde ","chemClass":"CLASS II","revDate":"2023-04-28","expDate":"2028-04-28","casNumber":"-","driveUrlBm":"https://drive.google.com/open?id=1mrll8aE6z4lMxq_VuCc4vsnbnlOVf9UH&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=15CD2Ep6WAIG5DWoWPadbaZR-ZQ9z2RSh&usp=drive_copy"},
+        {"id":1785909462772,"name":" WET & STICK 747","chemClass":"CLASS II","revDate":"2024-05-13","expDate":"2029-05-13","casNumber":"9004-58-4 ","driveUrlBm":"https://drive.google.com/open?id=1VcUt9zxPGtm1LvYoDw6a5UajCHjV9pxY&usp=drive_copy","driveUrlEng":null}
     ];
 
-    // ========================================================
-    // TENTUKAN PIN ADMIN KOD
-    // Jika terlupa, anda boleh tukar terus nilai '1234' di bawah
-    // ========================================================
+    // Default PIN: 1234
     function getAdminPin() {
         return localStorage.getItem('adminPin') || '1234'; 
     }
@@ -480,7 +471,6 @@
         }
     }
 
-    // Fungsi membaca data (Guna DATA_SDS_ASAL jika belum wujud dalam Browser)
     function getSDSData() {
         const stored = localStorage.getItem('sdsData');
         if (!stored) {
@@ -492,7 +482,7 @@
 
     function resetToDefaultData() {
         if (verifyAuthorizedPerson()) {
-            if (confirm("Adakah anda pasti mahu mengembalikan semua data SDS kepada data asal yang terembedded dalam kod?")) {
+            if (confirm("Adakah anda pasti mahu mengembalikan semua data SDS kepada data asal?")) {
                 localStorage.setItem('sdsData', JSON.stringify(DATA_SDS_ASAL));
                 renderTable();
                 alert("✅ Data berjaya di-reset ke data asal!");
@@ -537,10 +527,13 @@
 
     function formatDriveEmbedUrl(url) {
         if (!url) return null;
-        if (url.includes('/view')) {
-            return url.replace('/view', '/preview');
+        let formatted = url;
+        if (formatted.includes('/open?id=')) {
+            formatted = formatted.replace('/open?id=', '/file/d/').split('&')[0] + '/preview';
+        } else if (formatted.includes('/view')) {
+            formatted = formatted.replace('/view', '/preview');
         }
-        return url;
+        return formatted;
     }
 
     function renderTable() {
@@ -573,7 +566,7 @@
             tr.innerHTML = `
                 <td><strong>${item.name}</strong></td>
                 <td><span class="badge ${badgeClass}">${item.chemClass}</span></td>
-                <td><span class="badge ${status.class}" data-search="${status.rawStatus}">${status.text}</span></td>
+                <td><span class="badge ${status.class}">${status.text}</span></td>
                 <td>${item.revDate}</td>
                 <td>${item.expDate}</td>
                 <td>${item.casNumber || '-'}</td>
