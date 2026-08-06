@@ -54,6 +54,15 @@
             color: var(--primary);
         }
 
+        .sync-status {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #e2e8f0;
+            color: #475569;
+        }
+
         .card {
             background: var(--card-bg);
             border-radius: 8px;
@@ -193,13 +202,11 @@
             font-weight: 600;
         }
 
-        /* Class Hazchem Badges */
         .badge-class-1 { background: #fee2e2; color: #991b1b; }
         .badge-class-2 { background: #ffedd5; color: #9a3412; }
         .badge-class-3 { background: #fef3c7; color: #92400e; }
         .badge-class-4 { background: #dcfce7; color: #166534; }
 
-        /* Status Expiry Badges */
         .status-active { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
         .status-warning { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
         .status-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
@@ -297,7 +304,7 @@
     <div class="header">
         <h1>🌿 Sistem Pengurusan SDS & Bahan Kimia Estate</h1>
         <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 13px; color: var(--text-muted);">🔒 Kawalan Akses Authorized Person</span>
+            <span id="syncStatus" class="sync-status">📡 Memuatkan Data Cloud...</span>
             <button class="btn-action" onclick="changeAdminPin()" style="font-size: 11px;">⚙️ Tukar PIN Admin</button>
         </div>
     </div>
@@ -346,7 +353,7 @@
             </div>
             
             <div class="btn-group">
-                <button type="submit" id="btnSubmit" class="btn-primary">🔑 Simpan Rekod (Perlu PIN)</button>
+                <button type="submit" id="btnSubmit" class="btn-primary">🔑 Simpan Rekod Ke Cloud (Perlu PIN)</button>
                 <button type="button" id="btnCancel" class="btn-secondary" onclick="resetForm()" style="display: none;">Batal Edit</button>
             </div>
         </form>
@@ -357,7 +364,7 @@
         <input type="text" id="searchInput" class="search-input" onkeyup="filterTable()" placeholder="🔍 Cari bahan kimia, CAS No, status...">
         
         <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn-action" onclick="resetToDefaultData()" style="background: #e11d48; color: white; border: none; padding: 8px 12px; font-weight:600;">🔄 Reset Data Asal 🔒</button>
+            <button type="button" class="btn-action" onclick="resetToDefaultData()" style="background: #e11d48; color: white; border: none; padding: 8px 12px; font-weight:600;">🔄 Reset Data Asal Cloud 🔒</button>
             <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 12px; font-weight:600;">📥 Eksport Backup</button>
             <button type="button" class="btn-action" onclick="triggerImport()" style="background: #0d9488; color: white; border: none; padding: 8px 12px; font-weight:600;">📤 Import Data 🔒</button>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
@@ -380,7 +387,7 @@
                 </tr>
             </thead>
             <tbody id="sdsTableBody">
-                <!-- Data dimasukkan secara dinamik -->
+                <!-- Data dimasukkan secara dinamik dari Firebase -->
             </tbody>
         </table>
     </div>
@@ -407,12 +414,8 @@
     </div>
 </div>
 
+<!-- DATA ASAL SDS (BACKUP PAUTAN LOKAL) -->
 <script>
-    let activeModalItem = null;
-
-    // ========================================================
-    // DATA ASAL BAHAN KIMIA ESTATE TERSIMPAN DI DALAM KOD
-    // ========================================================
     const DATA_SDS_ASAL = [
         {"id":1785905741244,"name":"ANCOM AMINE 60, RARITY AMINE 60 ","chemClass":"CLASS II","revDate":"2022-08-08","expDate":"2027-08-08","casNumber":"2008-39-1","driveUrlBm":"https://drive.google.com/open?id=1s7u5bgxcQR2nc7vSrlW9PE8qM910CBtv&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=1s7u5bgxcQR2nc7vSrlW9PE8qM910CBtv&usp=drive_copy"},
         {"id":1785906072359,"name":"NK-13.75/27 (AC)","chemClass":"CLASS II","revDate":"2025-01-15","expDate":"2030-01-15","casNumber":"57-13-6, 7447-40-7","driveUrlBm":"https://drive.google.com/open?id=1m2ay1F0La5gRgOuzvnOqjTLTjgKFTUFC&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=10SvQPb4QFGzAl_9PtbHhX_J-ekTtroBT&usp=drive_copy"},
@@ -441,8 +444,74 @@
         {"id":1785909399844,"name":"Verde ","chemClass":"CLASS II","revDate":"2023-04-28","expDate":"2028-04-28","casNumber":"-","driveUrlBm":"https://drive.google.com/open?id=1mrll8aE6z4lMxq_VuCc4vsnbnlOVf9UH&usp=drive_copy","driveUrlEng":"https://drive.google.com/open?id=15CD2Ep6WAIG5DWoWPadbaZR-ZQ9z2RSh&usp=drive_copy"},
         {"id":1785909462772,"name":" WET & STICK 747","chemClass":"CLASS II","revDate":"2024-05-13","expDate":"2029-05-13","casNumber":"9004-58-4 ","driveUrlBm":"https://drive.google.com/open?id=1VcUt9zxPGtm1LvYoDw6a5UajCHjV9pxY&usp=drive_copy","driveUrlEng":null}
     ];
+</script>
 
-    // Default PIN: 1234
+<!-- FIREBASE REALTIME DATABASE INTEGRATION -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  // Konfigurasi Firebase Anda
+  const firebaseConfig = {
+    apiKey: "AIzaSyBJkWUTX5n9aCy0s23Gk9LpBLSkKI86-H0",
+    authDomain: "sds-estate.firebaseapp.com",
+    databaseURL: "https://sds-estate-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "sds-estate",
+    storageBucket: "sds-estate.firebasestorage.app",
+    messagingSenderId: "57912985374",
+    appId: "1:57912985374:web:c667cacb3873969366ab0f",
+    measurementId: "G-X4H9WDR34P"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const sdsRef = ref(db, 'sdsData');
+
+  window.globalSDSData = [];
+
+  // Dengar perubahan data secara Realtime dari Cloud
+  onValue(sdsRef, (snapshot) => {
+    const data = snapshot.val();
+    const statusElem = document.getElementById('syncStatus');
+    
+    if (data) {
+      window.globalSDSData = Array.isArray(data) ? data : Object.values(data);
+      if (statusElem) {
+        statusElem.innerText = "🟢 Realtime Cloud Synced";
+        statusElem.style.background = "#dcfce7";
+        statusElem.style.color = "#15803d";
+      }
+    } else {
+      window.globalSDSData = DATA_SDS_ASAL; 
+      set(sdsRef, DATA_SDS_ASAL); // Auto-populate data asal ke Firebase jika kosong
+    }
+    renderTable();
+  }, (error) => {
+    const statusElem = document.getElementById('syncStatus');
+    if (statusElem) {
+      statusElem.innerText = "🔴 Disconnected / Error";
+      statusElem.style.background = "#fee2e2";
+      statusElem.style.color = "#991b1b";
+    }
+    console.error("Firebase Error:", error);
+  });
+
+  // Fungsi Kemaskini / Simpan Data ke Cloud
+  window.saveToCloud = function(newDataArray) {
+    set(sdsRef, newDataArray)
+      .then(() => {
+          alert("✅ Data berjaya dikemaskini ke Cloud!");
+      })
+      .catch((err) => {
+          alert("❌ Ralat Cloud: " + err.message);
+      });
+  };
+</script>
+
+<!-- UTILITY & LOGIK APLIKASI -->
+<script>
+    let activeModalItem = null;
+
     function getAdminPin() {
         return localStorage.getItem('adminPin') || '1234'; 
     }
@@ -467,25 +536,6 @@
                 alert("✅ PIN Admin berjaya dikemaskini!");
             } else if (newPin !== null) {
                 alert("❌ PIN mestilah sekurang-kurangnya 4 digit.");
-            }
-        }
-    }
-
-    function getSDSData() {
-        const stored = localStorage.getItem('sdsData');
-        if (!stored) {
-            localStorage.setItem('sdsData', JSON.stringify(DATA_SDS_ASAL));
-            return DATA_SDS_ASAL;
-        }
-        return JSON.parse(stored);
-    }
-
-    function resetToDefaultData() {
-        if (verifyAuthorizedPerson()) {
-            if (confirm("Adakah anda pasti mahu mengembalikan semua data SDS kepada data asal?")) {
-                localStorage.setItem('sdsData', JSON.stringify(DATA_SDS_ASAL));
-                renderTable();
-                alert("✅ Data berjaya di-reset ke data asal!");
             }
         }
     }
@@ -517,11 +567,11 @@
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         if (diffDays < 0) {
-            return { text: '🔴 Luput', class: 'status-danger', rawStatus: 'Luput Expired' };
+            return { text: '🔴 Luput', class: 'status-danger' };
         } else if (diffDays <= 180) {
-            return { text: `🟠 Hampir Luput (${diffDays} hari)`, class: 'status-warning', rawStatus: 'Hampir Luput Expiring' };
+            return { text: `🟠 Hampir Luput (${diffDays} hari)`, class: 'status-warning' };
         } else {
-            return { text: '🟢 Aktif', class: 'status-active', rawStatus: 'Aktif Active' };
+            return { text: '🟢 Aktif', class: 'status-active' };
         }
     }
 
@@ -537,12 +587,12 @@
     }
 
     function renderTable() {
-        const data = getSDSData();
+        const data = window.globalSDSData || [];
         const tbody = document.getElementById('sdsTableBody');
         tbody.innerHTML = '';
 
         if (data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding:24px;">Tiada rekod SDS disimpan.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding:24px;">Tiada rekod SDS dijumpai.</td></tr>`;
             return;
         }
 
@@ -585,10 +635,9 @@
 
     function saveSDS(e) {
         e.preventDefault();
-        
         if (!verifyAuthorizedPerson()) return;
 
-        const data = getSDSData();
+        const data = [...(window.globalSDSData || [])];
         const editIndex = parseInt(document.getElementById('editIndex').value);
 
         const newItem = {
@@ -604,22 +653,18 @@
 
         if (editIndex >= 0) {
             data[editIndex] = newItem;
-            alert('Rekod SDS berjaya dikemaskini!');
         } else {
             data.push(newItem);
-            alert('Rekod SDS baru berjaya disimpan!');
         }
 
-        localStorage.setItem('sdsData', JSON.stringify(data));
+        window.saveToCloud(data);
         resetForm();
-        renderTable();
     }
 
     function editSDS(index) {
         if (!verifyAuthorizedPerson()) return;
 
-        const data = getSDSData();
-        const item = data[index];
+        const item = window.globalSDSData[index];
 
         document.getElementById('editIndex').value = index;
         document.getElementById('chemName').value = item.name;
@@ -631,7 +676,7 @@
         document.getElementById('driveUrlEng').value = item.driveUrlEng || '';
 
         document.getElementById('formTitle').innerText = '✏️ Kemaskini / Edit SDS Bahan Kimia';
-        document.getElementById('btnSubmit').innerText = '🔑 Kemaskini Rekod (Perlu PIN)';
+        document.getElementById('btnSubmit').innerText = '🔑 Kemaskini Rekod Ke Cloud (Perlu PIN)';
         document.getElementById('btnCancel').style.display = 'inline-block';
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -641,25 +686,31 @@
         document.getElementById('sdsForm').reset();
         document.getElementById('editIndex').value = '-1';
         document.getElementById('formTitle').innerText = '🔒 Pendaftaran & Kemaskini SDS (Memerlukan PIN)';
-        document.getElementById('btnSubmit').innerText = '🔑 Simpan Rekod (Perlu PIN)';
+        document.getElementById('btnSubmit').innerText = '🔑 Simpan Rekod Ke Cloud (Perlu PIN)';
         document.getElementById('btnCancel').style.display = 'none';
     }
 
     function deleteSDS(index) {
         if (!verifyAuthorizedPerson()) return;
 
-        if (confirm("Adakah anda pasti mahu memadamkan rekod ini?")) {
-            const data = getSDSData();
+        if (confirm("Adakah anda pasti mahu memadamkan rekod ini dari Cloud?")) {
+            const data = [...window.globalSDSData];
             data.splice(index, 1);
-            localStorage.setItem('sdsData', JSON.stringify(data));
+            window.saveToCloud(data);
             resetForm();
-            renderTable();
+        }
+    }
+
+    function resetToDefaultData() {
+        if (verifyAuthorizedPerson()) {
+            if (confirm("Adakah anda pasti mahu mengembalikan pangkalan data Cloud kepada 26 rekod SDS asal?")) {
+                window.saveToCloud(DATA_SDS_ASAL);
+            }
         }
     }
 
     function viewSDS(index) {
-        const data = getSDSData();
-        activeModalItem = data[index];
+        activeModalItem = window.globalSDSData[index];
 
         const status = getExpiryStatus(activeModalItem.expDate);
 
@@ -717,11 +768,7 @@
     }
 
     function exportData() {
-        const data = localStorage.getItem('sdsData');
-        if (!data || JSON.parse(data).length === 0) {
-            alert("Tiada data SDS untuk dieksport.");
-            return;
-        }
+        const data = JSON.stringify(window.globalSDSData || []);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -746,10 +793,8 @@
             try {
                 const importedData = JSON.parse(e.target.result);
                 if (Array.isArray(importedData)) {
-                    if (confirm("Adakah anda mahu menggantikan data sedia ada dengan fail backup ini?")) {
-                        localStorage.setItem('sdsData', JSON.stringify(importedData));
-                        renderTable();
-                        alert("Data SDS berjaya diimport!");
+                    if (confirm("Adakah anda mahu menggantikan data Cloud dengan fail backup ini?")) {
+                        window.saveToCloud(importedData);
                     }
                 } else {
                     alert("Format fail tidak sah.");
@@ -760,8 +805,6 @@
         };
         reader.readAsText(file);
     }
-
-    window.onload = renderTable;
 </script>
 
 </body>
