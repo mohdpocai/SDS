@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SDS Estate">
-    
+
     <!-- Pautan Logo Baharu -->
     <link rel="icon" type="image/png" href="./icon.png">
     <link rel="apple-touch-icon" href="./icon.png">
@@ -58,6 +58,8 @@
             margin-bottom: 24px;
             padding-bottom: 16px;
             border-bottom: 2px solid var(--border);
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
         .header h1 {
@@ -74,6 +76,40 @@
             background: #e2e8f0;
             color: #475569;
         }
+
+        /* Dashboard summary */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-card .stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .stat-total .stat-value { color: var(--text-main); }
+        .stat-valid .stat-value { color: #15803d; }
+        .stat-warning .stat-value { color: var(--warning); }
+        .stat-expired .stat-value { color: var(--danger); }
 
         .card {
             background: var(--card-bg);
@@ -129,6 +165,7 @@
             display: flex;
             gap: 10px;
             margin-top: 12px;
+            flex-wrap: wrap;
         }
 
         .btn-primary {
@@ -197,6 +234,7 @@
             border-bottom: 1px solid var(--border);
             text-transform: uppercase;
             font-size: 11px;
+            white-space: nowrap;
         }
 
         td {
@@ -212,6 +250,7 @@
             border-radius: 4px;
             font-size: 11px;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         .badge-class-1 { background: #fee2e2; color: #991b1b; }
@@ -261,6 +300,8 @@
             margin: 30px auto;
             padding: 24px;
             box-shadow: var(--shadow-md);
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -308,6 +349,16 @@
             border-radius: 6px;
             margin-top: 8px;
         }
+
+        @media (max-width: 640px) {
+            body { padding: 14px; }
+            .header h1 { font-size: 18px; }
+            .btn-group { flex-direction: column; }
+            .btn-group button { width: 100%; }
+            .controls > div { width: 100%; }
+            .controls .btn-action { flex: 1; justify-content: center; }
+            .modal-content { margin: 12px auto; padding: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -318,6 +369,26 @@
         <div style="display: flex; align-items: center; gap: 12px;">
             <span id="syncStatus" class="sync-status">📡 Memuatkan Data Cloud...</span>
             <button class="btn-action" onclick="changeAdminPin()" style="font-size: 11px;">⚙️ Tukar PIN Admin</button>
+        </div>
+    </div>
+
+    <!-- Dashboard Summary -->
+    <div class="dashboard">
+        <div class="stat-card stat-total">
+            <div class="stat-label">Jumlah Bahan Kimia</div>
+            <div class="stat-value" id="statTotal">-</div>
+        </div>
+        <div class="stat-card stat-valid">
+            <div class="stat-label">🟢 Aktif</div>
+            <div class="stat-value" id="statValid">-</div>
+        </div>
+        <div class="stat-card stat-warning">
+            <div class="stat-label">🟠 Hampir Luput (≤6 bulan)</div>
+            <div class="stat-value" id="statWarning">-</div>
+        </div>
+        <div class="stat-card stat-expired">
+            <div class="stat-label">🔴 Luput</div>
+            <div class="stat-value" id="statExpired">-</div>
         </div>
     </div>
 
@@ -353,7 +424,7 @@
                     <label>CAS No. (CAS Registry Number)</label>
                     <input type="text" id="casNumber" placeholder="Cth: 1071-83-6">
                 </div>
-                
+
                 <div class="form-group half-width">
                     <label>Pautan SDS Bahasa Melayu (BM)</label>
                     <input type="url" id="driveUrlBm" placeholder="https://drive.google.com/...">
@@ -363,7 +434,7 @@
                     <input type="url" id="driveUrlEng" placeholder="https://drive.google.com/...">
                 </div>
             </div>
-            
+
             <div class="btn-group">
                 <button type="submit" id="btnSubmit" class="btn-primary">🔑 Simpan Rekod Ke Cloud (Perlu PIN)</button>
                 <button type="button" id="btnCancel" class="btn-secondary" onclick="resetForm()" style="display: none;">Batal Edit</button>
@@ -374,8 +445,8 @@
     <!-- Controls -->
     <div class="controls">
         <input type="text" id="searchInput" class="search-input" onkeyup="filterTable()" placeholder="🔍 Cari bahan kimia, CAS No, status...">
-        
-        <div style="display: flex; gap: 8px;">
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="btn-action" onclick="resetToDefaultData()" style="background: #e11d48; color: white; border: none; padding: 8px 12px; font-weight:600;">🔄 Reset Data Asal Cloud 🔒</button>
             <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 12px; font-weight:600;">📥 Eksport Backup</button>
             <button type="button" class="btn-action" onclick="triggerImport()" style="background: #0d9488; color: white; border: none; padding: 8px 12px; font-weight:600;">📤 Import Data 🔒</button>
@@ -415,7 +486,7 @@
         <p style="font-size: 14px; margin-bottom: 6px;"><strong>Kelas:</strong> <span id="mClass"></span> | <strong>CAS No.:</strong> <span id="mCas"></span></p>
         <p style="font-size: 14px; margin-bottom: 6px;"><strong>Status Expiry:</strong> <span id="mStatus"></span></p>
         <p style="font-size: 14px; margin-bottom: 12px;"><strong>Revision Date:</strong> <span id="mRev"></span> | <strong>Expiry Date:</strong> <span id="mExp"></span></p>
-        
+
         <div style="background: var(--bg); padding: 12px; border-radius: 6px; margin-top: 10px;">
             <div class="tab-group">
                 <button class="tab-btn active" id="tabBm" onclick="switchModalPdf('BM')">🇲🇾 Bahasa Melayu</button>
@@ -462,6 +533,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import { getAuth, signInWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
   // Konfigurasi Firebase Anda
   const firebaseConfig = {
@@ -477,15 +549,52 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
+  const auth = getAuth(app);
   const sdsRef = ref(db, 'sdsData');
 
+  // Akaun admin kongsi - PIN yang dimasukkan pengguna ialah kata laluan akaun ini.
+  // Tukar emel ini jika anda guna emel lain semasa membuat akaun di Firebase console.
+  const ADMIN_EMAIL = "admin@sds-estate.local";
+
   window.globalSDSData = [];
+
+  // Sahkan Authorized Person melalui Firebase Auth sebenar (bukan hanya semakan di browser)
+  window.verifyAuthorizedPerson = async function () {
+    const inputPin = prompt("🔑 Pengesahan Authorized Person Required:\nSila masukkan PIN kebenaran:");
+    if (inputPin === null) return false;
+
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, inputPin);
+      return true;
+    } catch (err) {
+      alert("❌ PIN Salah! Akses ditolak.");
+      return false;
+    }
+  };
+
+  // Tukar PIN Admin = tukar kata laluan akaun Firebase Auth kongsi
+  window.changeAdminPin = async function () {
+    const ok = await window.verifyAuthorizedPerson();
+    if (!ok) return;
+
+    const newPin = prompt("Masukkan PIN Baru Authorized Person (sekurang-kurangnya 6 aksara):");
+    if (newPin && newPin.trim().length >= 6) {
+      try {
+        await updatePassword(auth.currentUser, newPin.trim());
+        alert("✅ PIN Admin berjaya dikemaskini!");
+      } catch (err) {
+        alert("❌ Ralat menukar PIN: " + err.message);
+      }
+    } else if (newPin !== null) {
+      alert("❌ PIN mestilah sekurang-kurangnya 6 aksara (keperluan Firebase Auth).");
+    }
+  };
 
   // Dengar perubahan data secara Realtime dari Cloud
   onValue(sdsRef, (snapshot) => {
     const data = snapshot.val();
     const statusElem = document.getElementById('syncStatus');
-    
+
     if (data) {
       window.globalSDSData = Array.isArray(data) ? data : Object.values(data);
       if (statusElem) {
@@ -494,7 +603,7 @@
         statusElem.style.color = "#15803d";
       }
     } else {
-      window.globalSDSData = DATA_SDS_ASAL; 
+      window.globalSDSData = DATA_SDS_ASAL;
       set(sdsRef, DATA_SDS_ASAL); // Auto-populate data asal ke Firebase jika kosong
     }
     renderTable();
@@ -523,45 +632,21 @@
 <!-- UTILITY & LOGIK APLIKASI -->
 <script>
     let activeModalItem = null;
-
-    function getAdminPin() {
-        return localStorage.getItem('adminPin') || '1234'; 
-    }
-
-    function verifyAuthorizedPerson() {
-        const inputPin = prompt("🔑 Pengesahan Authorized Person Required:\nSila masukkan PIN kebenaran:");
-        if (inputPin === null) return false;
-        
-        if (inputPin === getAdminPin()) {
-            return true;
-        } else {
-            alert("❌ PIN Salah! Akses ditolak.");
-            return false;
-        }
-    }
-
-    function changeAdminPin() {
-        if (verifyAuthorizedPerson()) {
-            const newPin = prompt("Masukkan PIN Baru Authorized Person:");
-            if (newPin && newPin.trim().length >= 4) {
-                localStorage.setItem('adminPin', newPin.trim());
-                alert("✅ PIN Admin berjaya dikemaskini!");
-            } else if (newPin !== null) {
-                alert("❌ PIN mestilah sekurang-kurangnya 4 digit.");
-            }
-        }
-    }
+    // Nota: verifyAuthorizedPerson() dan changeAdminPin() kini ditakrifkan dalam
+    // skrip module Firebase di atas, dan disambungkan ke window supaya boleh
+    // dipanggil dari sini. Ia benar-benar mengesahkan log masuk melalui Firebase
+    // Authentication, bukan sekadar semakan PIN di dalam pelayar.
 
     function autoCalculateExpiry() {
         const revDateInput = document.getElementById('revDate').value;
         if (revDateInput) {
             const revDate = new Date(revDateInput);
             revDate.setFullYear(revDate.getFullYear() + 5);
-            
+
             const year = revDate.getFullYear();
             const month = String(revDate.getMonth() + 1).padStart(2, '0');
             const day = String(revDate.getDate()).padStart(2, '0');
-            
+
             document.getElementById('expDate').value = `${year}-${month}-${day}`;
         }
     }
@@ -571,7 +656,7 @@
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         const expDate = new Date(expDateString);
         expDate.setHours(0, 0, 0, 0);
 
@@ -587,6 +672,18 @@
         }
     }
 
+    // Padanan kelas hazard tepat (bukan lagi berdasarkan substring yang mudah tersasar)
+    function getClassBadge(chemClass) {
+        const c = (chemClass || '').trim().toUpperCase();
+        switch (c) {
+            case 'CLASS I': return 'badge-class-1';
+            case 'CLASS II': return 'badge-class-2';
+            case 'CLASS III': return 'badge-class-3';
+            case 'CLASS IV': return 'badge-class-4';
+            default: return 'badge-class-4';
+        }
+    }
+
     function formatDriveEmbedUrl(url) {
         if (!url) return null;
         let formatted = url;
@@ -598,10 +695,26 @@
         return formatted;
     }
 
+    function updateDashboard(data) {
+        let valid = 0, warning = 0, expired = 0;
+        data.forEach(item => {
+            const status = getExpiryStatus(item.expDate);
+            if (status.class === 'status-danger') expired++;
+            else if (status.class === 'status-warning') warning++;
+            else if (status.class === 'status-active') valid++;
+        });
+        document.getElementById('statTotal').innerText = data.length;
+        document.getElementById('statValid').innerText = valid;
+        document.getElementById('statWarning').innerText = warning;
+        document.getElementById('statExpired').innerText = expired;
+    }
+
     function renderTable() {
         const data = window.globalSDSData || [];
         const tbody = document.getElementById('sdsTableBody');
         tbody.innerHTML = '';
+
+        updateDashboard(data);
 
         if (data.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding:24px;">Tiada rekod SDS dijumpai.</td></tr>`;
@@ -609,18 +722,14 @@
         }
 
         data.forEach((item, index) => {
-            let badgeClass = 'badge-class-4';
-            if (item.chemClass.includes('I') && !item.chemClass.includes('II') && !item.chemClass.includes('III') && !item.chemClass.includes('IV')) badgeClass = 'badge-class-1';
-            else if (item.chemClass.includes('II') && !item.chemClass.includes('III')) badgeClass = 'badge-class-2';
-            else if (item.chemClass.includes('III')) badgeClass = 'badge-class-3';
-
+            const badgeClass = getClassBadge(item.chemClass);
             const status = getExpiryStatus(item.expDate);
 
-            const bmBtn = item.driveUrlBm 
+            const bmBtn = item.driveUrlBm
                 ? `<a class="btn-action" href="${item.driveUrlBm}" target="_blank">📄 BM</a>`
                 : `<span style="color: var(--text-muted); font-size: 11px;">-</span>`;
 
-            const engBtn = item.driveUrlEng 
+            const engBtn = item.driveUrlEng
                 ? `<a class="btn-action" href="${item.driveUrlEng}" target="_blank">📄 ENG</a>`
                 : `<span style="color: var(--text-muted); font-size: 11px;">-</span>`;
 
@@ -645,9 +754,9 @@
         });
     }
 
-    function saveSDS(e) {
+    async function saveSDS(e) {
         e.preventDefault();
-        if (!verifyAuthorizedPerson()) return;
+        if (!(await window.verifyAuthorizedPerson())) return;
 
         const data = [...(window.globalSDSData || [])];
         const editIndex = parseInt(document.getElementById('editIndex').value);
@@ -673,8 +782,8 @@
         resetForm();
     }
 
-    function editSDS(index) {
-        if (!verifyAuthorizedPerson()) return;
+    async function editSDS(index) {
+        if (!(await window.verifyAuthorizedPerson())) return;
 
         const item = window.globalSDSData[index];
 
@@ -702,8 +811,8 @@
         document.getElementById('btnCancel').style.display = 'none';
     }
 
-    function deleteSDS(index) {
-        if (!verifyAuthorizedPerson()) return;
+    async function deleteSDS(index) {
+        if (!(await window.verifyAuthorizedPerson())) return;
 
         if (confirm("Adakah anda pasti mahu memadamkan rekod ini dari Cloud?")) {
             const data = [...window.globalSDSData];
@@ -713,8 +822,8 @@
         }
     }
 
-    function resetToDefaultData() {
-        if (verifyAuthorizedPerson()) {
+    async function resetToDefaultData() {
+        if (await window.verifyAuthorizedPerson()) {
             if (confirm("Adakah anda pasti mahu mengembalikan pangkalan data Cloud kepada 26 rekod SDS asal?")) {
                 window.saveToCloud(DATA_SDS_ASAL);
             }
@@ -746,7 +855,7 @@
         if (lang === 'BM') {
             tabBm.classList.add('active');
             tabEng.classList.remove('active');
-            
+
             if (activeModalItem && activeModalItem.driveUrlBm) {
                 container.innerHTML = `<iframe src="${formatDriveEmbedUrl(activeModalItem.driveUrlBm)}"></iframe>`;
             } else {
@@ -790,13 +899,15 @@
         URL.revokeObjectURL(url);
     }
 
-    function triggerImport() {
-        if (verifyAuthorizedPerson()) {
+    async function triggerImport() {
+        if (await window.verifyAuthorizedPerson()) {
             document.getElementById('importFile').click();
         }
     }
 
     function importData(event) {
+        // Nota: butang "Import Data" sudah memanggil triggerImport(), yang sudah
+        // mengesahkan PIN sebelum membuka pemilih fail, jadi tidak perlu semak lagi di sini.
         const file = event.target.files[0];
         if (!file) return;
 
