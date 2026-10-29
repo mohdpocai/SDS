@@ -17,6 +17,9 @@
     <link rel="apple-touch-icon" href="./icon.png">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- pdf.js: baca teks PDF SDS di pelayar untuk auto-isi Revision Date & nama -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
             --primary: #1b5e20;
@@ -154,6 +157,26 @@
             border-radius: 6px;
             font-size: 14px;
         }
+
+        input[type="file"] {
+            padding: 7px 8px;
+            font-size: 13px;
+            background: #f8fafc;
+        }
+
+        .parse-status {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            white-space: pre-line;
+        }
+
+        .parse-status.ok { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+        .parse-status.warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
 
         input[readonly] {
             background-color: #f1f5f9;
@@ -425,15 +448,22 @@
                     <input type="text" id="casNumber" placeholder="Cth: 1071-83-6">
                 </div>
 
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>📎 Muat Naik Fail SDS (PDF) - BM / BI dikesan automatik</label>
+                    <input type="file" id="filePdf" accept="application/pdf,.pdf" multiple onchange="handlePdfPicked(this)">
+                    <small style="color: var(--text-muted);">Pilih 1 atau 2 fail PDF sekali gus (cth: versi BM dan versi BI). Sistem akan kesan bahasa dan isi Revision Date.</small>
+                </div>
                 <div class="form-group half-width">
                     <label>Pautan SDS Bahasa Melayu (BM)</label>
-                    <input type="url" id="driveUrlBm" placeholder="https://drive.google.com/...">
+                    <input type="url" id="driveUrlBm" placeholder="Diisi automatik, atau tampal pautan Drive">
                 </div>
                 <div class="form-group half-width">
                     <label>Pautan SDS Bahasa Inggeris (ENG)</label>
-                    <input type="url" id="driveUrlEng" placeholder="https://drive.google.com/...">
+                    <input type="url" id="driveUrlEng" placeholder="Diisi automatik, atau tampal pautan Drive">
                 </div>
             </div>
+
+            <div id="pdfParseStatus" class="parse-status" style="display: none;"></div>
 
             <div class="btn-group">
                 <button type="submit" id="btnSubmit" class="btn-primary">🔑 Simpan Rekod Ke Cloud (Perlu PIN)</button>
@@ -534,6 +564,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
   import { getAuth, signInWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
   // Konfigurasi Firebase Anda
   const firebaseConfig = {
@@ -550,7 +581,18 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const auth = getAuth(app);
+  const storage = getStorage(app);
   const sdsRef = ref(db, 'sdsData');
+
+  // Muat naik PDF SDS ke Firebase Storage dan pulangkan pautan muat turun.
+  // Mesti dipanggil selepas verifyAuthorizedPerson() (perlu log masuk).
+  window.uploadSdsPdf = async function (file, lang) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+    const path = `sds/${Date.now()}_${lang}_${safeName}`;
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file, { contentType: 'application/pdf' });
+    return await getDownloadURL(fileRef);
+  };
 
   // Akaun admin kongsi - PIN yang dimasukkan pengguna ialah kata laluan akaun ini.
   // Tukar emel ini jika anda guna emel lain semasa membuat akaun di Firebase console.
@@ -637,19 +679,278 @@
     // dipanggil dari sini. Ia benar-benar mengesahkan log masuk melalui Firebase
     // Authentication, bukan sekadar semakan PIN di dalam pelayar.
 
+    // ---- Auto-isi daripada PDF -------------------------------------------------
+    let revAutoFilled = false;   // true jika Revision Date diisi automatik (boleh ditimpa pickup PDF seterusnya)
+    let nameAutoFilled = false;  // sama untuk Nama Bahan Kimia
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    // Tambah 5 tahun pada tarikh ISO (YYYY-MM-DD) tanpa masalah zon masa
+    function addFiveYears(iso) {
+        const [y, m, d] = iso.split('-').map(Number);
+        const dt = new Date(Date.UTC(y + 5, m - 1, d));
+        return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+    }
+
     function autoCalculateExpiry() {
         const revDateInput = document.getElementById('revDate').value;
         if (revDateInput) {
-            const revDate = new Date(revDateInput);
-            revDate.setFullYear(revDate.getFullYear() + 5);
-
-            const year = revDate.getFullYear();
-            const month = String(revDate.getMonth() + 1).padStart(2, '0');
-            const day = String(revDate.getDate()).padStart(2, '0');
-
-            document.getElementById('expDate').value = `${year}-${month}-${day}`;
+            document.getElementById('expDate').value = addFiveYears(revDateInput);
         }
     }
+
+    // Jika pengguna ubah tarikh / nama dengan tangan, jangan timpa lagi secara automatik
+    document.getElementById('revDate').addEventListener('input', () => { revAutoFilled = false; });
+    document.getElementById('chemName').addEventListener('input', () => { nameAutoFilled = false; });
+
+    const MONTHS = {
+        jan: 1, january: 1, januari: 1, feb: 2, february: 2, februari: 2,
+        mar: 3, march: 3, mac: 3, apr: 4, april: 4, may: 5, mei: 5,
+        jun: 6, june: 6, jul: 7, july: 7, julai: 7, aug: 8, august: 8, ogos: 8,
+        sep: 9, sept: 9, september: 9, oct: 10, october: 10, okt: 10, oktober: 10,
+        nov: 11, november: 11, dec: 12, december: 12, dis: 12, disember: 12
+    };
+
+    function validYMD(y, m, d) {
+        if (y < 1990 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        if (dt.getUTCMonth() !== m - 1) return null;
+        return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+
+    // Cari tarikh paling awal dalam teks; pulangkan ISO atau null
+    function findFirstDate(s) {
+        const found = [];
+        let m;
+
+        const reIso = /(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/g;
+        while ((m = reIso.exec(s))) {
+            const iso = validYMD(+m[1], +m[2], +m[3]);
+            if (iso) found.push({ i: m.index, iso });
+        }
+
+        const reNum = /(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/g;
+        while ((m = reNum.exec(s))) {
+            let a = +m[1], b = +m[2];
+            let d = a, mo = b;                  // lalai: dd/mm/yyyy (format Malaysia)
+            if (a <= 12 && b > 12) { mo = a; d = b; }
+            const iso = validYMD(+m[3], mo, d);
+            if (iso) found.push({ i: m.index, iso });
+        }
+
+        const reDMY = /(\d{1,2})(?:st|nd|rd|th)?[\s\-.,]*([A-Za-z]{3,9})\.?[\s\-.,]*(\d{4})/g;
+        while ((m = reDMY.exec(s))) {
+            const mo = MONTHS[m[2].toLowerCase()];
+            const iso = mo && validYMD(+m[3], mo, +m[1]);
+            if (iso) found.push({ i: m.index, iso });
+        }
+
+        const reMDY = /([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/g;
+        while ((m = reMDY.exec(s))) {
+            const mo = MONTHS[m[1].toLowerCase()];
+            const iso = mo && validYMD(+m[3], mo, +m[2]);
+            if (iso) found.push({ i: m.index, iso });
+        }
+
+        if (!found.length) return null;
+        found.sort((x, y) => x.i - y.i);
+        return found[0].iso;
+    }
+
+    // Label tarikh semakan (utama) dan tarikh keluaran (sandaran)
+    const REV_LABELS = /date\s+of\s+(?:last\s+)?revision|revision\s+date|date\s+revised|last\s+revised|revised(?:\s+on)?|revision|tarikh\s+(?:semakan|disemak|kemaskini)(?:\s+semula)?|semakan(?:\s+semula)?/gi;
+    const ISSUE_LABELS = /date\s+of\s+(?:issue|preparation|compilation)|issue\s+date|date\s+issued|date\s+prepared|preparation\s+date|version\s+date|tarikh\s+(?:dikeluarkan|disediakan|keluaran|penyediaan)/gi;
+
+    function collectLabelledDates(text, labelRe, maxDate) {
+        const dates = [];
+        labelRe.lastIndex = 0;
+        let m;
+        while ((m = labelRe.exec(text))) {
+            const win = text.slice(m.index + m[0].length, m.index + m[0].length + 50);
+            const iso = findFirstDate(win);
+            if (iso && iso <= maxDate) dates.push(iso);
+        }
+        return dates;
+    }
+
+    function extractRevisionDate(text) {
+        const flat = text.replace(/\s+/g, ' ');
+        const next = new Date(); next.setFullYear(next.getFullYear() + 1);
+        const maxDate = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`;
+
+        // Jika ada beberapa tarikh semakan (jadual sejarah semakan), ambil yang terbaru
+        let dates = collectLabelledDates(flat, REV_LABELS, maxDate);
+        if (!dates.length) dates = collectLabelledDates(flat, ISSUE_LABELS, maxDate);
+        if (!dates.length) return null;
+        return dates.sort().pop();
+    }
+
+    function extractProductName(text) {
+        const re = /(?:product\s+name|product\s+identifier|product\s+trade\s+name|trade\s+name|nama\s+produk|nama\s+dagangan|pengecam\s+produk)\s*[:：]?[ \t]*\n?[ \t]*([^\n]{2,80})/gi;
+        const bad = /^(product|code|synonym|cas|recommended|supplier|relevant|other|1\.\d|section|bahagian|kod|nama|:)/i;
+        let m;
+        while ((m = re.exec(text))) {
+            let v = m[1].replace(/^[:：\s]+/, '')
+                        .replace(/^(?:product\s+name|trade\s+name|nama\s+produk|nama\s+dagangan)\s*[:：]?\s*/i, '')
+                        .replace(/\s{2,}.*$/, '').trim();
+            if (v.length >= 2 && !bad.test(v)) return v;
+        }
+        return null;
+    }
+
+    async function readPdfText(file) {
+        if (typeof pdfjsLib === 'undefined') throw new Error('pdf.js tidak dapat dimuatkan (semak sambungan internet).');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const pages = Math.min(pdf.numPages, 25);
+        let all = '', first = '';
+        for (let p = 1; p <= pages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            const t = content.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('');
+            all += t + '\n';
+            if (p <= 2) first += t + '\n';
+        }
+        return { all, first };
+    }
+
+    function showParseStatus(msg, kind) {
+        const el = document.getElementById('pdfParseStatus');
+        el.style.display = 'block';
+        el.className = 'parse-status' + (kind ? ' ' + kind : '');
+        el.textContent = msg;
+    }
+
+    // ---- Kesan bahasa PDF (BM / BI) ----
+    const MS_WORDS = ['yang','dan','untuk','atau','dengan','bahan','keselamatan','lembaran','bahaya','pertolongan','kebakaran','pengendalian','penyimpanan','tidak','adalah','pengenalan','langkah','tindakan','kimia','campuran','kandungan','kawalan','pendedahan','pelupusan','pengangkutan'];
+    const EN_WORDS = ['the','and','of','for','with','hazard','hazards','safety','sheet','identification','first','measures','handling','storage','not','is','are','product','chemical','mixture','fire','exposure','disposal','transport','information'];
+
+    // Pulangkan 'BM', 'ENG' atau 'BOTH' (dwibahasa / tidak pasti)
+    function detectLanguage(text, fileName) {
+        const words = (text.toLowerCase().match(/[a-z]+/g) || []);
+        const ms = new Set(MS_WORDS), en = new Set(EN_WORDS);
+        let m = 0, e = 0;
+        for (const w of words) {
+            if (ms.has(w)) m++;
+            else if (en.has(w)) e++;
+        }
+        const total = m + e;
+        const ratio = total ? m / total : 0.5;
+        if (ratio >= 0.7) return 'BM';
+        if (ratio <= 0.3) return 'ENG';
+
+        // Dwibahasa / tidak jelas: guna petunjuk nama fail jika ada
+        const n = (fileName || '').toLowerCase();
+        if (/(^|[^a-z])(bm|malay|melayu)([^a-z]|$)/.test(n)) return 'BM';
+        if (/(^|[^a-z])(bi|eng|english|inggeris)([^a-z]|$)/.test(n)) return 'ENG';
+        return 'BOTH';
+    }
+
+    // Fail PDF yang dipilih dan dikesan, menunggu dimuat naik semasa simpan
+    let pickedPdf = { BM: null, ENG: null };
+
+    async function handlePdfPicked(input) {
+        const files = Array.from(input.files || []);
+        pickedPdf = { BM: null, ENG: null };
+        if (!files.length) return;
+
+        if (files.length > 2) {
+            alert('Sila pilih maksimum 2 fail (satu BM, satu BI).');
+            input.value = '';
+            return;
+        }
+        for (const f of files) {
+            if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') {
+                alert(`"${f.name}" bukan fail PDF.`);
+                input.value = '';
+                return;
+            }
+            if (f.size > 20 * 1024 * 1024) {
+                alert(`"${f.name}" terlalu besar (maksimum 20MB).`);
+                input.value = '';
+                return;
+            }
+        }
+
+        showParseStatus(`⏳ Membaca ${files.length} fail PDF ...`);
+        const lines = [];
+        let warn = false;
+        const dates = [];
+        let name = null;
+
+        for (const file of files) {
+            try {
+                const { all, first } = await readPdfText(file);
+                if (all.replace(/\s/g, '').length < 30) {
+                    lines.push(`⚠️ ${file.name}: tiada teks dalam PDF (imbasan/gambar), bahasa & tarikh tidak dapat dikesan.`);
+                    warn = true;
+                    // Tidak dapat kesan: letak ke slot kosong pertama
+                    const slot = !pickedPdf.BM ? 'BM' : 'ENG';
+                    pickedPdf[slot] = file;
+                    continue;
+                }
+
+                const lang = detectLanguage(all, file.name);
+                if (lang === 'BOTH') {
+                    // Dwibahasa: guna fail yang sama untuk kedua-dua slot jika kosong
+                    if (!pickedPdf.BM) pickedPdf.BM = file;
+                    if (!pickedPdf.ENG) pickedPdf.ENG = file;
+                    lines.push(`📄 ${file.name}: dwibahasa / tidak pasti, digunakan untuk BM dan ENG.`);
+                } else if (!pickedPdf[lang]) {
+                    pickedPdf[lang] = file;
+                    lines.push(`📄 ${file.name}: dikesan ${lang === 'BM' ? 'Bahasa Melayu (BM)' : 'Bahasa Inggeris (ENG)'}.`);
+                } else {
+                    // Dua fail bahasa sama: letak yang kedua ke slot lain
+                    const other = lang === 'BM' ? 'ENG' : 'BM';
+                    if (!pickedPdf[other]) {
+                        pickedPdf[other] = file;
+                        lines.push(`⚠️ ${file.name}: dikesan ${lang} juga, diletakkan di slot ${other}. Sila semak.`);
+                        warn = true;
+                    }
+                }
+
+                const d = extractRevisionDate(all);
+                if (d) dates.push(d);
+                if (!name) name = extractProductName(first);
+            } catch (err) {
+                console.error(err);
+                lines.push(`⚠️ ${file.name}: gagal dibaca (${err.message}).`);
+                warn = true;
+            }
+        }
+
+        // Revision Date: ambil yang terbaru antara fail
+        const revInput = document.getElementById('revDate');
+        const nameInput = document.getElementById('chemName');
+        const revDate = dates.sort().pop();
+        const editing = parseInt(document.getElementById('editIndex').value) >= 0;
+
+        if (revDate) {
+            // Semasa edit, PDF baharu = semakan baharu, jadi tarikh dikemaskini daripada PDF
+            if (!revInput.value || revAutoFilled || editing) {
+                revInput.value = revDate;
+                revAutoFilled = true;
+                autoCalculateExpiry();
+                lines.push(`✅ Revision Date: ${revDate} (Expiry: ${document.getElementById('expDate').value})`);
+            } else if (revInput.value !== revDate) {
+                lines.push(`ℹ️ PDF menunjukkan Revision Date ${revDate}, tetapi tarikh yang anda isi sendiri dikekalkan.`);
+            }
+        } else {
+            lines.push('⚠️ Revision Date tidak dijumpai dalam PDF. Sila isi secara manual.');
+            warn = true;
+        }
+
+        if (name && (!nameInput.value || nameAutoFilled)) {
+            nameInput.value = name;
+            nameAutoFilled = true;
+            lines.push(`✅ Nama produk: ${name}`);
+        }
+
+        lines.push('Sila semak nilai yang diisi automatik sebelum simpan.');
+        showParseStatus(lines.join('\n'), warn || !revDate ? 'warn' : 'ok');
+    }
+    // -----------------------------------------------------------------------------
 
     function getExpiryStatus(expDateString) {
         if (!expDateString) return { text: 'Tiada Tarikh', class: '' };
@@ -761,6 +1062,35 @@
         const data = [...(window.globalSDSData || [])];
         const editIndex = parseInt(document.getElementById('editIndex').value);
 
+        // Muat naik PDF yang dipilih (jika ada) ke Firebase Storage dan guna pautannya
+        let urlBm = document.getElementById('driveUrlBm').value || null;
+        let urlEng = document.getElementById('driveUrlEng').value || null;
+        const fileBm = pickedPdf.BM;
+        const fileEng = pickedPdf.ENG;
+
+        if (fileBm || fileEng) {
+            const btn = document.getElementById('btnSubmit');
+            const oldLabel = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = '⏳ Memuat naik PDF ...';
+            try {
+                if (fileBm) urlBm = await window.uploadSdsPdf(fileBm, 'BM');
+                if (fileEng) {
+                    // Fail dwibahasa yang sama: guna pautan yang sama, tak perlu muat naik dua kali
+                    urlEng = (fileEng === fileBm) ? urlBm : await window.uploadSdsPdf(fileEng, 'ENG');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('❌ Gagal memuat naik PDF: ' + err.message +
+                      '\n\nSemak Firebase Storage sudah diaktifkan dan peraturan (rules) membenarkan tulis oleh pengguna yang log masuk.');
+                btn.disabled = false;
+                btn.innerText = oldLabel;
+                return;
+            }
+            btn.disabled = false;
+            btn.innerText = oldLabel;
+        }
+
         const newItem = {
             id: editIndex >= 0 ? data[editIndex].id : Date.now(),
             name: document.getElementById('chemName').value,
@@ -768,8 +1098,8 @@
             revDate: document.getElementById('revDate').value,
             expDate: document.getElementById('expDate').value,
             casNumber: document.getElementById('casNumber').value || '-',
-            driveUrlBm: document.getElementById('driveUrlBm').value || null,
-            driveUrlEng: document.getElementById('driveUrlEng').value || null
+            driveUrlBm: urlBm,
+            driveUrlEng: urlEng
         };
 
         if (editIndex >= 0) {
@@ -805,6 +1135,10 @@
 
     function resetForm() {
         document.getElementById('sdsForm').reset();
+        document.getElementById('pdfParseStatus').style.display = 'none';
+        pickedPdf = { BM: null, ENG: null };
+        revAutoFilled = false;
+        nameAutoFilled = false;
         document.getElementById('editIndex').value = '-1';
         document.getElementById('formTitle').innerText = '🔒 Pendaftaran & Kemaskini SDS (Memerlukan PIN)';
         document.getElementById('btnSubmit').innerText = '🔑 Simpan Rekod Ke Cloud (Perlu PIN)';
