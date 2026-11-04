@@ -590,7 +590,6 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
   import { getAuth, signInWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
   // Konfigurasi Firebase Anda
   const firebaseConfig = {
@@ -607,17 +606,38 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const auth = getAuth(app);
-  const storage = getStorage(app);
   const sdsRef = ref(db, 'sdsData');
 
-  // Muat naik PDF SDS ke Firebase Storage dan pulangkan pautan muat turun.
-  // Mesti dipanggil selepas verifyAuthorizedPerson() (perlu log masuk).
+  // Muat naik PDF SDS ke folder Google Drive melalui Google Apps Script (lihat apps-script/Code.gs).
+  // Tampal URL Web App selepas "Deploy" di sini:
+  const DRIVE_UPLOAD_URL = "";
+
+  // Mesti dipanggil selepas verifyAuthorizedPerson() (perlu log masuk) -
+  // skrip Drive menyemak token log masuk admin sebelum menerima fail.
   window.uploadSdsPdf = async function (file, lang) {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
-    const path = `sds/${Date.now()}_${lang}_${safeName}`;
-    const fileRef = storageRef(storage, path);
-    await uploadBytes(fileRef, file, { contentType: 'application/pdf' });
-    return await getDownloadURL(fileRef);
+    if (!DRIVE_UPLOAD_URL) {
+      throw new Error("Muat naik ke Google Drive belum disediakan (DRIVE_UPLOAD_URL kosong).");
+    }
+    if (!auth.currentUser) throw new Error("Sila sahkan PIN dahulu.");
+
+    const idToken = await auth.currentUser.getIdToken();
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = () => reject(new Error("Gagal membaca fail PDF."));
+      reader.readAsDataURL(file);
+    });
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._ -]+/g, '_');
+    // text/plain mengelakkan CORS preflight yang tidak disokong oleh Apps Script
+    const res = await fetch(DRIVE_UPLOAD_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ idToken, name: `${lang}_${safeName}`, data })
+    });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || "Ralat tidak diketahui dari Google Drive.");
+    return out.url;
   };
 
   // Akaun admin kongsi - PIN yang dimasukkan pengguna ialah kata laluan akaun ini.
@@ -1290,7 +1310,7 @@
         const data = [...(window.globalSDSData || [])];
         const editIndex = parseInt(document.getElementById('editIndex').value);
 
-        // Muat naik PDF yang dipilih (jika ada) ke Firebase Storage dan guna pautannya
+        // Muat naik PDF yang dipilih (jika ada) ke Google Drive dan guna pautannya
         let urlBm = document.getElementById('driveUrlBm').value || null;
         let urlEng = document.getElementById('driveUrlEng').value || null;
         const fileBm = pickedPdf.BM;
@@ -1300,7 +1320,7 @@
             const btn = document.getElementById('btnSubmit');
             const oldLabel = btn.innerText;
             btn.disabled = true;
-            btn.innerText = '⏳ Memuat naik PDF ...';
+            btn.innerText = '⏳ Memuat naik PDF ke Google Drive ...';
             try {
                 if (fileBm) urlBm = await window.uploadSdsPdf(fileBm, 'BM');
                 if (fileEng) {
@@ -1310,7 +1330,10 @@
             } catch (err) {
                 console.error(err);
                 alert('❌ Gagal memuat naik PDF: ' + err.message +
-                      '\n\nSemak Firebase Storage sudah diaktifkan dan peraturan (rules) membenarkan tulis oleh pengguna yang log masuk.');
+                      '\n\nAnda masih boleh simpan dengan menampal pautan Google Drive secara manual.');
+                // Kosongkan fail yang dipilih supaya simpanan seterusnya guna pautan yang ditampal
+                pickedPdf = { BM: null, ENG: null };
+                document.getElementById('filePdf').value = '';
                 btn.disabled = false;
                 btn.innerText = oldLabel;
                 return;
