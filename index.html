@@ -922,7 +922,8 @@
         return m ? m[1] : null;
     }
 
-    // Senarai amaran pendua berbanding rekod lain (rekod yang sedang diedit dikecualikan)
+    // Rekod lain yang mungkin pendua (rekod yang sedang diedit dikecualikan).
+    // Pulangkan [{ index, id, msg }], disusun: fail PDF sama > pautan sama > nama sama.
     function findDuplicates({ name, hashes, urls, excludeIndex }) {
         const data = window.globalSDSData || [];
         const keys = new Set(nameKeys(name));
@@ -934,14 +935,14 @@
             if (i === excludeIndex) return;
             const label = `"${(item.name || '').trim()}" (Rev: ${item.revDate || '-'})`;
             if (hs.size && [item.pdfHashBm, item.pdfHashEng].some(h => h && hs.has(h))) {
-                out.push(`⚠️ Fail PDF ini sudah dimuat naik untuk ${label}.`);
+                out.push({ index: i, id: item.id, rank: 0, label, msg: `⚠️ Fail PDF ini sudah dimuat naik untuk ${label}.` });
             } else if (ids.size && [item.driveUrlBm, item.driveUrlEng].map(driveFileId).some(id => id && ids.has(id))) {
-                out.push(`⚠️ Pautan Drive ini sudah digunakan oleh ${label}.`);
+                out.push({ index: i, id: item.id, rank: 1, label, msg: `⚠️ Pautan Drive ini sudah digunakan oleh ${label}.` });
             } else if (keys.size && nameKeys(item.name).some(k => keys.has(k))) {
-                out.push(`⚠️ Nama bahan kimia ini sudah wujud: ${label}. Jika ini versi baharu, guna butang Edit pada rekod itu.`);
+                out.push({ index: i, id: item.id, rank: 2, label, msg: `⚠️ Nama bahan kimia ini sudah wujud: ${label}.` });
             }
         });
-        return out;
+        return out.sort((x, y) => x.rank - y.rank);
     }
 
     async function handlePdfPicked(input) {
@@ -1049,7 +1050,8 @@
             excludeIndex: parseInt(document.getElementById('editIndex').value)
         });
         if (dupes.length) {
-            lines.push(...dupes);
+            lines.push(...dupes.map(d => d.msg));
+            lines.push('ℹ️ Semasa simpan, anda boleh pilih untuk GANTI rekod lama dengan yang baharu.');
             warn = true;
         }
 
@@ -1393,11 +1395,30 @@
             ],
             excludeIndex: editIndex
         });
-        if (dupes.length && !confirm('Kemungkinan rekod pendua:\n\n' + dupes.join('\n') + '\n\nTeruskan simpan juga?')) return;
+        // Rekod baharu yang pendua: tanya sama ada mahu ganti rekod lama
+        let replaceId = null;
+        if (dupes.length && editIndex < 0) {
+            const top = dupes[0];
+            const others = dupes.slice(1).map(d => d.msg).join('\n');
+            if (confirm(top.msg + (others ? '\n' + others : '') +
+                        `\n\nGANTI rekod lama ${top.label} dengan maklumat & PDF baharu ini?` +
+                        '\n(Kod QR yang sudah dicetak untuk rekod itu akan terus berfungsi.)' +
+                        '\n\nOK = Ganti rekod lama\nCancel = Pilihan lain')) {
+                replaceId = top.id;
+            } else if (!confirm('Simpan sebagai rekod BAHARU yang berasingan (rekod lama dikekalkan)?\n\nOK = Simpan rekod baharu\nCancel = Batal')) {
+                return;
+            }
+        } else if (dupes.length && !confirm('Kemungkinan rekod pendua:\n\n' + dupes.map(d => d.msg).join('\n') + '\n\nTeruskan simpan juga?')) {
+            return;
+        }
 
         if (!(await window.verifyAuthorizedPerson())) return;
 
         const data = [...(window.globalSDSData || [])];
+        // Indeks rekod yang akan ditulis semula: rekod yang diedit, atau rekod lama yang diganti
+        const replaceIndex = replaceId !== null ? data.findIndex(x => x.id === replaceId) : -1;
+        const targetIndex = editIndex >= 0 ? editIndex : replaceIndex;
+        const old = targetIndex >= 0 ? data[targetIndex] : null;
 
         // Muat naik PDF yang dipilih (jika ada) ke Google Drive dan guna pautannya
         let urlBm = document.getElementById('driveUrlBm').value || null;
@@ -1431,24 +1452,29 @@
             btn.innerText = oldLabel;
         }
 
+        const formName = document.getElementById('chemName').value;
+        const formCas = document.getElementById('casNumber').value;
         const newItem = {
-            id: editIndex >= 0 ? data[editIndex].id : Date.now(),
-            name: document.getElementById('chemName').value,
+            id: old ? old.id : Date.now(),
+            // Semasa ganti: kekalkan nama penuh lama jika nama baharu hanya salah satu jenamanya
+            name: (replaceIndex >= 0 && old && nameKeys(formName)[0] !== nameKeys(old.name)[0]
+                   && nameKeys(old.name).includes(nameKeys(formName)[0])) ? old.name : formName,
             chemClass: document.getElementById('chemClass').value,
             revDate: document.getElementById('revDate').value,
             expDate: document.getElementById('expDate').value,
-            casNumber: document.getElementById('casNumber').value || '-',
-            driveUrlBm: urlBm,
-            driveUrlEng: urlEng,
+            // Semasa ganti: medan kosong dalam borang kekalkan nilai lama
+            casNumber: formCas || (replaceIndex >= 0 && old ? old.casNumber : '-') || '-',
+            driveUrlBm: urlBm || (replaceIndex >= 0 && old ? old.driveUrlBm : null) || null,
+            driveUrlEng: urlEng || (replaceIndex >= 0 && old ? old.driveUrlEng : null) || null,
             // Cap jari PDF untuk kesan pendua; kekalkan yang lama jika pautan tidak berubah
-            pdfHashBm: fileBm ? (pickedHash.get(fileBm) || null)
-                : (editIndex >= 0 && data[editIndex].driveUrlBm === urlBm ? (data[editIndex].pdfHashBm || null) : null),
-            pdfHashEng: fileEng ? (pickedHash.get(fileEng) || null)
-                : (editIndex >= 0 && data[editIndex].driveUrlEng === urlEng ? (data[editIndex].pdfHashEng || null) : null)
+            pdfHashBm: fileBm ? (pickedHash.get(fileBm) || null) : null,
+            pdfHashEng: fileEng ? (pickedHash.get(fileEng) || null) : null
         };
+        if (old && !fileBm && old.driveUrlBm === newItem.driveUrlBm) newItem.pdfHashBm = old.pdfHashBm || null;
+        if (old && !fileEng && old.driveUrlEng === newItem.driveUrlEng) newItem.pdfHashEng = old.pdfHashEng || null;
 
-        if (editIndex >= 0) {
-            data[editIndex] = newItem;
+        if (targetIndex >= 0) {
+            data[targetIndex] = newItem;
         } else {
             data.push(newItem);
         }
