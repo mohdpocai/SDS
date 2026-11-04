@@ -499,7 +499,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Nama Bahan Kimia</th>
+                    <th id="thName" onclick="toggleNameSort()" style="cursor:pointer; user-select:none;" title="Klik untuk tukar susunan">Nama Bahan Kimia <span id="nameSortIcon">▲</span></th>
                     <th>Kelas</th>
                     <th>Status SDS</th>
                     <th>Revision Date</th>
@@ -1116,6 +1116,22 @@
         document.getElementById('statExpired').innerText = expired;
     }
 
+    let nameSortDir = 1;   // 1 = A-Z, -1 = Z-A
+
+    function sortedByName(data) {
+        return data
+            .map((item, index) => ({ item, index }))
+            .sort((a, b) => nameSortDir * String(a.item.name || '').trim()
+                .localeCompare(String(b.item.name || '').trim(), 'ms', { sensitivity: 'base', numeric: true }));
+    }
+
+    function toggleNameSort() {
+        nameSortDir = -nameSortDir;
+        document.getElementById('nameSortIcon').innerText = nameSortDir === 1 ? '▲' : '▼';
+        renderTable();
+        filterTable();
+    }
+
     function renderTable() {
         const data = window.globalSDSData || [];
         const tbody = document.getElementById('sdsTableBody');
@@ -1128,7 +1144,8 @@
             return;
         }
 
-        data.forEach((item, index) => {
+        // Papar mengikut nama (A-Z / Z-A); index asal dikekalkan untuk Detail/Edit/Hapus/QR
+        sortedByName(data).forEach(({ item, index }) => {
             const badgeClass = getClassBadge(item.chemClass);
             const status = getExpiryStatus(item.expDate);
 
@@ -1346,7 +1363,7 @@
             alert('Tiada rekod SDS untuk dicetak.');
             return;
         }
-        const labels = data.map(item => ({ src: buildQRLabel(item), name: item.name }));
+        const labels = sortedByName(data).map(({ item }) => ({ src: buildQRLabel(item), name: item.name }));
         openPrintWindow(labels, 'Kod QR Semua SDS');
     }
 
