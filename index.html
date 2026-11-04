@@ -1215,17 +1215,38 @@
             alert('❌ Pop-up disekat. Benarkan pop-up untuk laman ini dan cuba lagi.');
             return;
         }
-        const imgs = labels.map(l => `<div class="lbl"><img src="${l.src}" alt="${escapeHtml(l.name)}"></div>`).join('');
+        const img = l => `<img src="${l.src}" alt="${escapeHtml(l.name)}">`;
+        let body, css;
+        if (labels.length > 1) {
+            // Cetak semua: A4 landscape, 2 label saiz A5 sebelah-menyebelah (potong di garisan putus-putus)
+            let pages = '';
+            for (let i = 0; i < labels.length; i += 2) {
+                const a = labels[i], b = labels[i + 1];
+                pages += `<div class="page"><div class="half">${img(a)}</div><div class="half">${b ? img(b) : ''}</div></div>`;
+            }
+            body = pages;
+            css = `
+                @page { size: A4 landscape; margin: 0; }
+                .page { width: 297mm; height: 209mm; display: flex; overflow: hidden;
+                        break-after: page; page-break-after: always; }
+                .page:last-child { break-after: auto; page-break-after: auto; }
+                .half { width: 148.5mm; height: 100%; box-sizing: border-box; padding: 8mm;
+                        display: flex; align-items: center; justify-content: center; }
+                .half:first-child { border-right: 1px dashed #999; }
+                .half img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }`;
+        } else {
+            body = `<div class="single">${img(labels[0])}</div>`;
+            css = `
+                @page { size: A4; margin: 10mm; }
+                .single { max-width: 90mm; margin: 0 auto; }
+                .single img { width: 100%; display: block; }`;
+        }
         win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
             <style>
-                @page { size: A4; margin: 10mm; }
                 body { margin: 0; font-family: Arial, sans-serif; }
-                .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; }
-                .lbl { break-inside: avoid; page-break-inside: avoid; }
-                .lbl img { width: 100%; display: block; }
-                .single { max-width: 90mm; margin: 0 auto; }
+                * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }${css}
             </style></head>
-            <body><div class="${labels.length > 1 ? 'grid' : 'single'}">${imgs}</div>
+            <body>${body}
             <script>window.onload = function () { window.print(); };<\/script></body></html>`);
         win.document.close();
     }
