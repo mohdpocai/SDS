@@ -20,6 +20,8 @@
 
     <!-- pdf.js: baca teks PDF SDS di pelayar untuk auto-isi Revision Date & nama -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- qrcode-generator: jana kod QR untuk setiap SDS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <style>
         :root {
             --primary: #1b5e20;
@@ -382,6 +384,13 @@
             .controls .btn-action { flex: 1; justify-content: center; }
             .modal-content { margin: 12px auto; padding: 16px; }
         }
+
+        /* ---- Kod QR SDS ---- */
+        .qr-modal-content { max-width: 420px; text-align: center; }
+        #qrPreview { width: 100%; max-width: 320px; border: 1px solid var(--border); border-radius: 8px; }
+        .qr-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+        .qr-actions .btn-action { padding: 8px 12px; font-weight: 600; }
+        .qr-link { font-size: 11px; color: var(--text-muted); word-break: break-all; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -478,6 +487,7 @@
 
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="btn-action" onclick="resetToDefaultData()" style="background: #e11d48; color: white; border: none; padding: 8px 12px; font-weight:600;">🔄 Reset Data Asal Cloud 🔒</button>
+            <button type="button" class="btn-action" onclick="printAllQR()" style="background: #1b5e20; color: white; border: none; padding: 8px 12px; font-weight:600;">🔳 Cetak Semua QR</button>
             <button type="button" class="btn-action" onclick="exportData()" style="background: #0284c7; color: white; border: none; padding: 8px 12px; font-weight:600;">📥 Eksport Backup</button>
             <button type="button" class="btn-action" onclick="triggerImport()" style="background: #0d9488; color: white; border: none; padding: 8px 12px; font-weight:600;">📤 Import Data 🔒</button>
             <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
@@ -524,6 +534,22 @@
             </div>
             <div id="pdfViewerContainer"></div>
         </div>
+    </div>
+</div>
+
+<!-- Modal Kod QR -->
+<div id="qrModal" class="modal" onclick="if (event.target === this) closeQRModal()">
+    <div class="modal-content qr-modal-content">
+        <div class="modal-header">
+            <h2 style="font-size: 18px; color: var(--primary);">🔳 Kod QR SDS</h2>
+            <button class="close-btn" onclick="closeQRModal()">&times;</button>
+        </div>
+        <img id="qrPreview" alt="Kod QR SDS">
+        <div class="qr-actions">
+            <button class="btn-action" onclick="downloadQR()">⬇️ Muat Turun PNG</button>
+            <button class="btn-action" onclick="printSingleQR()">🖨️ Cetak</button>
+        </div>
+        <div class="qr-link" id="qrLink"></div>
     </div>
 </div>
 
@@ -1047,12 +1073,193 @@
                 </td>
                 <td style="text-align: right;">
                     <button class="btn-action" onclick="viewSDS(${index})">Detail</button>
+                    <button class="btn-action" onclick="showQR(${index})">🔳 QR</button>
                     <button class="btn-action btn-warning" onclick="editSDS(${index})">Edit 🔒</button>
                     <button class="btn-action btn-danger" onclick="deleteSDS(${index})">Hapus 🔒</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
+
+        openSdsFromUrl();
+    }
+
+    // ---- Kod QR untuk setiap SDS -------------------------------------------------
+    // QR membawa pautan aplikasi ini + ?sds=<id>. Bila diimbas, aplikasi terus
+    // membuka butiran SDS tersebut. Nama bahan kimia dicetak pada label QR.
+    let qrActiveItem = null;
+    let qrActiveDataUrl = null;
+    let sdsUrlHandled = false;
+
+    function sdsLinkFor(item) {
+        const base = location.origin + location.pathname.replace(/index\.html$/i, '');
+        return `${base}?sds=${encodeURIComponent(item.id)}`;
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Pecahkan teks kepada beberapa baris mengikut lebar maksimum
+    function wrapText(ctx, text, maxWidth) {
+        const words = text.split(/\s+/).filter(Boolean);
+        const lines = [];
+        let line = '';
+        words.forEach(w => {
+            const test = line ? line + ' ' + w : w;
+            if (ctx.measureText(test).width > maxWidth && line) {
+                lines.push(line);
+                line = w;
+            } else {
+                line = test;
+            }
+        });
+        if (line) lines.push(line);
+        return lines;
+    }
+
+    // Lukis label QR (tajuk + QR + nama bahan kimia) dan pulangkan PNG data URL
+    function buildQRLabel(item) {
+        const qr = qrcode(0, 'M');
+        qr.addData(sdsLinkFor(item));
+        qr.make();
+
+        const W = 600, pad = 56, headerH = 70;
+        const qrSize = W - pad * 2;
+        const name = (item.name || '').trim().toUpperCase();
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        ctx.font = 'bold 34px Arial, sans-serif';
+        const nameLines = wrapText(ctx, name, W - pad * 2);
+        const nameH = nameLines.length * 42;
+        const H = headerH + pad + qrSize + 24 + nameH + 40 + pad;
+
+        canvas.width = W;
+        canvas.height = H;
+
+        // Latar & bingkai
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = '#1b5e20';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(3, 3, W - 6, H - 6);
+
+        // Tajuk
+        ctx.fillStyle = '#1b5e20';
+        ctx.fillRect(0, 0, W, headerH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 28px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('IMBAS UNTUK SDS', W / 2, headerH / 2);
+
+        // Kod QR
+        const count = qr.getModuleCount();
+        const cell = Math.floor(qrSize / count);
+        const offset = Math.floor((W - cell * count) / 2);
+        const top = headerH + pad;
+        ctx.fillStyle = '#000000';
+        for (let r = 0; r < count; r++) {
+            for (let c = 0; c < count; c++) {
+                if (qr.isDark(r, c)) ctx.fillRect(offset + c * cell, top + r * cell, cell, cell);
+            }
+        }
+
+        // Nama bahan kimia
+        let y = top + qrSize + 24;
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 34px Arial, sans-serif';
+        ctx.textBaseline = 'top';
+        nameLines.forEach(l => { ctx.fillText(l, W / 2, y); y += 42; });
+
+        // Kelas & tarikh semakan
+        ctx.fillStyle = '#475569';
+        ctx.font = '22px Arial, sans-serif';
+        ctx.fillText(`${item.chemClass || ''}  •  Rev: ${item.revDate || '-'}`, W / 2, y + 6);
+
+        return canvas.toDataURL('image/png');
+    }
+
+    function showQR(index) {
+        if (typeof qrcode === 'undefined') {
+            alert('❌ Pustaka QR gagal dimuatkan. Semak sambungan internet dan cuba lagi.');
+            return;
+        }
+        qrActiveItem = window.globalSDSData[index];
+        qrActiveDataUrl = buildQRLabel(qrActiveItem);
+        document.getElementById('qrPreview').src = qrActiveDataUrl;
+        document.getElementById('qrLink').innerText = sdsLinkFor(qrActiveItem);
+        document.getElementById('qrModal').style.display = 'block';
+    }
+
+    function closeQRModal() {
+        document.getElementById('qrModal').style.display = 'none';
+        qrActiveItem = null;
+        qrActiveDataUrl = null;
+    }
+
+    function downloadQR() {
+        if (!qrActiveItem) return;
+        const a = document.createElement('a');
+        a.href = qrActiveDataUrl;
+        a.download = `QR_SDS_${(qrActiveItem.name || 'SDS').trim().replace(/[^a-zA-Z0-9]+/g, '_')}.png`;
+        a.click();
+    }
+
+    // Buka tetingkap cetakan dengan satu atau lebih label QR
+    function openPrintWindow(labels, title) {
+        const win = window.open('', '_blank');
+        if (!win) {
+            alert('❌ Pop-up disekat. Benarkan pop-up untuk laman ini dan cuba lagi.');
+            return;
+        }
+        const imgs = labels.map(l => `<div class="lbl"><img src="${l.src}" alt="${escapeHtml(l.name)}"></div>`).join('');
+        win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+            <style>
+                @page { size: A4; margin: 10mm; }
+                body { margin: 0; font-family: Arial, sans-serif; }
+                .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; }
+                .lbl { break-inside: avoid; page-break-inside: avoid; }
+                .lbl img { width: 100%; display: block; }
+                .single { max-width: 90mm; margin: 0 auto; }
+            </style></head>
+            <body><div class="${labels.length > 1 ? 'grid' : 'single'}">${imgs}</div>
+            <script>window.onload = function () { window.print(); };<\/script></body></html>`);
+        win.document.close();
+    }
+
+    function printSingleQR() {
+        if (!qrActiveItem) return;
+        openPrintWindow([{ src: qrActiveDataUrl, name: qrActiveItem.name }], `QR SDS - ${qrActiveItem.name}`);
+    }
+
+    function printAllQR() {
+        if (typeof qrcode === 'undefined') {
+            alert('❌ Pustaka QR gagal dimuatkan. Semak sambungan internet dan cuba lagi.');
+            return;
+        }
+        const data = window.globalSDSData || [];
+        if (data.length === 0) {
+            alert('Tiada rekod SDS untuk dicetak.');
+            return;
+        }
+        const labels = data.map(item => ({ src: buildQRLabel(item), name: item.name }));
+        openPrintWindow(labels, 'Kod QR Semua SDS');
+    }
+
+    // Bila aplikasi dibuka melalui imbasan QR (?sds=<id>), terus buka butiran SDS itu
+    function openSdsFromUrl() {
+        if (sdsUrlHandled) return;
+        const id = new URLSearchParams(location.search).get('sds');
+        if (!id) { sdsUrlHandled = true; return; }
+        const data = window.globalSDSData || [];
+        const index = data.findIndex(item => String(item.id) === id);
+        if (index >= 0) {
+            sdsUrlHandled = true;
+            viewSDS(index);
+        }
     }
 
     async function saveSDS(e) {
