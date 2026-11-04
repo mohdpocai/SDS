@@ -16,7 +16,7 @@
  * akaun admin (iaitu orang yang memasukkan PIN yang betul dalam aplikasi).
  */
 
-const FOLDER_ID = 'TAMPAL_ID_FOLDER_DI_SINI';
+const FOLDER_ID = '1twXpnXstQnIngitdKVDp0YpNYvqNSGTp'; // Folder "SDS Estate" dalam Google Drive
 
 // Sama seperti dalam index.html (kunci API web Firebase ini bukan rahsia)
 const FIREBASE_API_KEY = 'AIzaSyBJkWUTX5n9aCy0s23Gk9LpBLSkKI86-H0';
