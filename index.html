@@ -896,9 +896,58 @@
     // Fail PDF yang dipilih dan dikesan, menunggu dimuat naik semasa simpan
     let pickedPdf = { BM: null, ENG: null };
 
+    // ---- Kesan rekod / fail pendua ----------------------------------------------
+    // Cap jari SHA-256 bagi setiap fail PDF yang dipilih (fail sama = cap jari sama)
+    const pickedHash = new Map();
+
+    async function fileHash(file) {
+        if (!(window.crypto && crypto.subtle)) return null;
+        const buf = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // "PALMOL GP1, GP KROPSI" -> ['PALMOLGP1GPKROPSI', 'PALMOLGP1', 'GPKROPSI']
+    function nameKeys(name) {
+        const norm = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
+        const full = norm(name);
+        if (!full) return [];
+        const parts = String(name).split(/[,/;]+/).map(norm).filter(k => k.length >= 3);
+        return [...new Set([full, ...parts])];
+    }
+
+    // Ambil ID fail Google Drive daripada pautan (open?id=, /file/d/, uc?id=)
+    function driveFileId(url) {
+        if (!url) return null;
+        const m = String(url).match(/(?:[?&]id=|\/file\/d\/)([a-zA-Z0-9_-]{10,})/);
+        return m ? m[1] : null;
+    }
+
+    // Senarai amaran pendua berbanding rekod lain (rekod yang sedang diedit dikecualikan)
+    function findDuplicates({ name, hashes, urls, excludeIndex }) {
+        const data = window.globalSDSData || [];
+        const keys = new Set(nameKeys(name));
+        const ids = new Set((urls || []).map(driveFileId).filter(Boolean));
+        const hs = new Set((hashes || []).filter(Boolean));
+        const out = [];
+
+        data.forEach((item, i) => {
+            if (i === excludeIndex) return;
+            const label = `"${(item.name || '').trim()}" (Rev: ${item.revDate || '-'})`;
+            if (hs.size && [item.pdfHashBm, item.pdfHashEng].some(h => h && hs.has(h))) {
+                out.push(`⚠️ Fail PDF ini sudah dimuat naik untuk ${label}.`);
+            } else if (ids.size && [item.driveUrlBm, item.driveUrlEng].map(driveFileId).some(id => id && ids.has(id))) {
+                out.push(`⚠️ Pautan Drive ini sudah digunakan oleh ${label}.`);
+            } else if (keys.size && nameKeys(item.name).some(k => keys.has(k))) {
+                out.push(`⚠️ Nama bahan kimia ini sudah wujud: ${label}. Jika ini versi baharu, guna butang Edit pada rekod itu.`);
+            }
+        });
+        return out;
+    }
+
     async function handlePdfPicked(input) {
         const files = Array.from(input.files || []);
         pickedPdf = { BM: null, ENG: null };
+        pickedHash.clear();
         if (!files.length) return;
 
         if (files.length > 2) {
@@ -927,6 +976,7 @@
 
         for (const file of files) {
             try {
+                pickedHash.set(file, await fileHash(file).catch(() => null));
                 const { all, first } = await readPdfText(file);
                 if (all.replace(/\s/g, '').length < 30) {
                     lines.push(`⚠️ ${file.name}: tiada teks dalam PDF (imbasan/gambar), bahasa & tarikh tidak dapat dikesan.`);
@@ -991,6 +1041,16 @@
             nameInput.value = name;
             nameAutoFilled = true;
             lines.push(`✅ Nama produk: ${name}`);
+        }
+
+        const dupes = findDuplicates({
+            name: nameInput.value,
+            hashes: [...pickedHash.values()],
+            excludeIndex: parseInt(document.getElementById('editIndex').value)
+        });
+        if (dupes.length) {
+            lines.push(...dupes);
+            warn = true;
         }
 
         lines.push('Sila semak nilai yang diisi automatik sebelum simpan.');
@@ -1305,10 +1365,22 @@
 
     async function saveSDS(e) {
         e.preventDefault();
+
+        const editIndex = parseInt(document.getElementById('editIndex').value);
+        const dupes = findDuplicates({
+            name: document.getElementById('chemName').value,
+            hashes: [pickedPdf.BM, pickedPdf.ENG].filter(Boolean).map(f => pickedHash.get(f)),
+            urls: pickedPdf.BM || pickedPdf.ENG ? [] : [
+                document.getElementById('driveUrlBm').value,
+                document.getElementById('driveUrlEng').value
+            ],
+            excludeIndex: editIndex
+        });
+        if (dupes.length && !confirm('Kemungkinan rekod pendua:\n\n' + dupes.join('\n') + '\n\nTeruskan simpan juga?')) return;
+
         if (!(await window.verifyAuthorizedPerson())) return;
 
         const data = [...(window.globalSDSData || [])];
-        const editIndex = parseInt(document.getElementById('editIndex').value);
 
         // Muat naik PDF yang dipilih (jika ada) ke Google Drive dan guna pautannya
         let urlBm = document.getElementById('driveUrlBm').value || null;
@@ -1350,7 +1422,12 @@
             expDate: document.getElementById('expDate').value,
             casNumber: document.getElementById('casNumber').value || '-',
             driveUrlBm: urlBm,
-            driveUrlEng: urlEng
+            driveUrlEng: urlEng,
+            // Cap jari PDF untuk kesan pendua; kekalkan yang lama jika pautan tidak berubah
+            pdfHashBm: fileBm ? (pickedHash.get(fileBm) || null)
+                : (editIndex >= 0 && data[editIndex].driveUrlBm === urlBm ? (data[editIndex].pdfHashBm || null) : null),
+            pdfHashEng: fileEng ? (pickedHash.get(fileEng) || null)
+                : (editIndex >= 0 && data[editIndex].driveUrlEng === urlEng ? (data[editIndex].pdfHashEng || null) : null)
         };
 
         if (editIndex >= 0) {
@@ -1388,6 +1465,7 @@
         document.getElementById('sdsForm').reset();
         document.getElementById('pdfParseStatus').style.display = 'none';
         pickedPdf = { BM: null, ENG: null };
+        pickedHash.clear();
         revAutoFilled = false;
         nameAutoFilled = false;
         document.getElementById('editIndex').value = '-1';
